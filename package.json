@@ -8,7 +8,9 @@
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "install:all": "npm install && npm install --prefix client && npm install --prefix server",
-    "build:client": "npm run build --prefix client"
+    "build:client": "npm run build --prefix client",
+    "prisma:studio": "npm run prisma:studio --prefix server",
+    "prisma:migrate": "npm run prisma:migrate --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
