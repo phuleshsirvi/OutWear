@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(uuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+
+  items        Item[]
+  outfits      Outfit[]
+  outfitItems  OutfitItem[]
+  wearLogs     WearLog[]
+}
+
+model Item {
+  id          String       @id @default(uuid())
+  userId      String
+  name        String
+  category    String
+  color       String
+  season      String
+  occasion    String
+  fabric      String
+  price       Float?
+  imageUrl    String
+  wearCount   Int          @default(0)
+  lastWornAt  DateTime?
+  createdAt   DateTime     @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfitItems OutfitItem[]
+  wearLogs    WearLog[]
+}
+
+model Outfit {
+  id          String       @id @default(uuid())
+  userId      String
+  name        String
+  occasion    String
+  createdAt   DateTime     @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfitItems OutfitItem[]
+  wearLogs    WearLog[]
+}
+
+model OutfitItem {
+  id        String   @id @default(uuid())
+  userId    String
+  outfitId  String
+  itemId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfit    Outfit   @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([outfitId, itemId])
+}
+
+model WearLog {
+  id       String   @id @default(uuid())
+  userId   String
+  itemId   String?
+  outfitId String?
+  wornAt   DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item     Item?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  outfit   Outfit?  @relation(fields: [outfitId], references: [id], onDelete: SetNull)
+}
