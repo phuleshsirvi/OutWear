@@ -1,0 +1,43 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables (.env in server or root fallback)
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'OutWear server is healthy',
+    timestamp: new Date().toISOString(),
+    port: PORT,
+  });
+});
+
+// Root fallback endpoint
+app.get('/', (req, res) => {
+  res.json({
+    name: 'OutWear API',
+    status: 'online',
+    health: '/api/health',
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`OutWear server running on port ${PORT}`);
+  console.log(`Health check available at http://localhost:${PORT}/api/health`);
+});
