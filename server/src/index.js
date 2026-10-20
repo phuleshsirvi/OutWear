@@ -1,8 +1,12 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+import authRoutes from './routes/auth.routes.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +21,7 @@ const PORT = process.env.PORT || 4000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(cookieParser());
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -28,6 +33,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// API Routes
+app.use('/api/auth', authRoutes);
+
 // Root fallback endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -36,6 +44,9 @@ app.get('/', (req, res) => {
     health: '/api/health',
   });
 });
+
+// Central Error Handler (must be mounted after all routes)
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`OutWear server running on port ${PORT}`);
