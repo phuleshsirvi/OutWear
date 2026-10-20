@@ -31,9 +31,9 @@ model Item {
   color       String
   season      String
   occasion    String
-  fabric      String
+  fabric      String?
   price       Float?
-  imageUrl    String
+  imageUrl    String?
   wearCount   Int          @default(0)
   lastWornAt  DateTime?
   createdAt   DateTime     @default(now())
