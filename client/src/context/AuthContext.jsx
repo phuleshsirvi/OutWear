@@ -1,11 +1,22 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import apiClient from '../api/client.js';
+import apiClient, { setUnauthorizedHandler } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Register 401 handler with apiClient to clear user session on unauthorized responses
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null);
+    });
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
+  }, []);
 
   // Restore user session on app start via GET /auth/me
   useEffect(() => {

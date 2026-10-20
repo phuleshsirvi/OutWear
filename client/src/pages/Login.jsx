@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+
+  const from = location.state?.from?.pathname || '/wardrobe';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,8 +25,8 @@ export default function Login() {
         password,
       });
 
-      // On success, navigate to /wardrobe
-      navigate('/wardrobe');
+      // Navigate to the originally requested page or /wardrobe by default
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Invalid email or password');
     } finally {
@@ -105,6 +108,7 @@ export default function Login() {
           Don't have an account yet?{' '}
           <Link
             to="/signup"
+            state={{ from: location.state?.from }}
             className="text-indigo-400 hover:text-indigo-300 font-medium underline underline-offset-4"
           >
             Create an account

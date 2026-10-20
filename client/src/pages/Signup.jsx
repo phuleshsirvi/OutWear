@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Signup() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signup } = useAuth();
+
+  const from = location.state?.from?.pathname || '/wardrobe';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -43,8 +46,8 @@ export default function Signup() {
         password,
       });
 
-      // On success, navigate to /wardrobe
-      navigate('/wardrobe');
+      // Navigate to the originally requested page or /wardrobe by default
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Failed to sign up. Please try again.');
     } finally {
@@ -162,6 +165,7 @@ export default function Signup() {
           Already have an account?{' '}
           <Link
             to="/login"
+            state={{ from: location.state?.from }}
             className="text-indigo-400 hover:text-indigo-300 font-medium underline underline-offset-4"
           >
             Log in
