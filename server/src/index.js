@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 
 import authRoutes from './routes/auth.routes.js';
 import itemRoutes from './routes/item.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,6 +43,7 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/items', itemRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Root fallback endpoint
 app.get('/', (req, res) => {

@@ -44,6 +44,16 @@ export const createItemSchema = z.object({
     .trim()
     .optional()
     .nullable()
+    .refine(
+      (val) => !val || val.startsWith('https://res.cloudinary.com/'),
+      { message: 'imageUrl must start with https://res.cloudinary.com/' }
+    )
+    .transform((val) => (val && val.length > 0 ? val : null)),
+  imagePublicId: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
     .transform((val) => (val && val.length > 0 ? val : null)),
 });
 
@@ -66,8 +76,17 @@ export const createItem = async (req, res, next) => {
       });
     }
 
-    const { name, category, color, season, occasion, fabric, price, imageUrl } =
-      validationResult.data;
+    const {
+      name,
+      category,
+      color,
+      season,
+      occasion,
+      fabric,
+      price,
+      imageUrl,
+      imagePublicId,
+    } = validationResult.data;
 
     const item = await prisma.item.create({
       data: {
@@ -80,6 +99,7 @@ export const createItem = async (req, res, next) => {
         fabric,
         price,
         imageUrl,
+        imagePublicId,
       },
     });
 

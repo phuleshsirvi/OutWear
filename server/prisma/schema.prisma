@@ -24,23 +24,24 @@ model User {
 }
 
 model Item {
-  id          String       @id @default(uuid())
-  userId      String
-  name        String
-  category    String
-  color       String
-  season      String
-  occasion    String
-  fabric      String?
-  price       Float?
-  imageUrl    String?
-  wearCount   Int          @default(0)
-  lastWornAt  DateTime?
-  createdAt   DateTime     @default(now())
+  id            String       @id @default(uuid())
+  userId        String
+  name          String
+  category      String
+  color         String
+  season        String
+  occasion      String
+  fabric        String?
+  price         Float?
+  imageUrl      String?
+  imagePublicId String?
+  wearCount     Int          @default(0)
+  lastWornAt    DateTime?
+  createdAt     DateTime     @default(now())
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  outfitItems OutfitItem[]
-  wearLogs    WearLog[]
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfitItems   OutfitItem[]
+  wearLogs      WearLog[]
 }
 
 model Outfit {

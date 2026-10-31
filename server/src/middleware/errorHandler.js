@@ -11,6 +11,18 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Multer errors (e.g. LIMIT_FILE_SIZE, LIMIT_UNEXPECTED_FILE)
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        error: 'File too large. Maximum allowed size is 5 MB',
+      });
+    }
+    return res.status(400).json({
+      error: err.message || 'File upload error',
+    });
+  }
+
   // Zod validation error fallback
   if (err.name === 'ZodError' || err.issues) {
     const issues = err.issues || err.errors || [];
