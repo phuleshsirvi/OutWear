@@ -8,6 +8,7 @@ import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import Wardrobe from './pages/Wardrobe.jsx';
+import AddItem from './pages/AddItem.jsx';
 import Outfits from './pages/Outfits.jsx';
 import Stats from './pages/Stats.jsx';
 import NotFound from './pages/NotFound.jsx';
@@ -30,6 +31,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route path="/wardrobe" element={<Wardrobe />} />
+              <Route path="/wardrobe/add" element={<AddItem />} />
               <Route path="/outfits" element={<Outfits />} />
               <Route path="/stats" element={<Stats />} />
             </Route>
