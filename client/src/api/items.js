@@ -30,8 +30,18 @@ export async function createItem(data) {
   });
 }
 
+/**
+ * Fetch all wardrobe items for the authenticated user
+ * @returns {Promise<Array<object>>} List of items
+ */
+export async function getItems() {
+  return apiClient('/items', {
+    method: 'GET',
+  });
+}
+
 export default {
   uploadImage,
   createItem,
+  getItems,
 };
-
