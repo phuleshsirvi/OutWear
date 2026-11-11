@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteItem } from '../api/items.js';
+import { logItemWear } from '../api/wear.js';
 
 // Common color to hex code mapping
 const COLOR_MAP = {
@@ -44,7 +45,7 @@ function getColorStyle(colorStr) {
     };
   }
 
-  // Substring match (e.g. "navy blue" -> navy, "dark grey" -> grey)
+  // Substring match
   for (const [name, hex] of Object.entries(COLOR_MAP)) {
     if (normalized.includes(name)) {
       return {
@@ -54,8 +55,19 @@ function getColorStyle(colorStr) {
     }
   }
 
-  // Neutral dot for unknown colors
   return { backgroundColor: '#94a3b8' };
+}
+
+function formatLastWorn(date) {
+  if (!date) return 'Never worn';
+  const now = new Date();
+  const worn = new Date(date);
+  const diffMs = now.getTime() - worn.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return 'Worn today';
+  if (diffDays === 1) return 'Last worn yesterday';
+  return `Last worn ${diffDays} days ago`;
 }
 
 export default function ItemCard({ item, onDelete }) {
@@ -64,10 +76,61 @@ export default function ItemCard({ item, onDelete }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  const colorStyle = getColorStyle(item.color);
-  const categoryKey = item.category?.toLowerCase() || '';
-  const emoji = CATEGORY_EMOJI[categoryKey] || '👗';
-  const categoryInitial = item.category ? item.category.charAt(0).toUpperCase() : '?';
+  // Local wear tracking states to update card without refetching the grid
+  const [wearCount, setWearCount] = useState(item.wearCount || 0);
+  const [lastWornAt, setLastWornAt] = useState(item.lastWornAt || null);
+  const [isLoggingWear, setIsLoggingWear] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [toast, setToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Sync state if item prop changes
+  useEffect(() => {
+    setWearCount(item.wearCount || 0);
+    setLastWornAt(item.lastWornAt || null);
+  }, [item.wearCount, item.lastWornAt]);
+
+  // Clean up toast timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 3200);
+  };
+
+  const handleLogWear = async (customDate) => {
+    setIsLoggingWear(true);
+    try {
+      const dateToLog = customDate || undefined;
+      const updated = await logItemWear(item.id, dateToLog);
+
+      setWearCount(updated.wearCount);
+      setLastWornAt(updated.lastWornAt);
+      setShowDatePicker(false);
+      setSelectedDate('');
+
+      const label = customDate ? `Logged for ${customDate}` : 'Logged for today';
+      showToast(`✓ ${label}! (Worn ${updated.wearCount}x)`, 'success');
+    } catch (err) {
+      if (err.status === 409 || err.message?.includes('Already logged')) {
+        showToast('⚠️ Already logged for this day', 'warning');
+      } else {
+        showToast(err.message || 'Failed to log wear', 'error');
+      }
+    } finally {
+      setIsLoggingWear(false);
+    }
+  };
 
   const handleDelete = async () => {
     setDeleteError('');
@@ -85,9 +148,14 @@ export default function ItemCard({ item, onDelete }) {
     }
   };
 
+  const colorStyle = getColorStyle(item.color);
+  const categoryKey = item.category?.toLowerCase() || '';
+  const emoji = CATEGORY_EMOJI[categoryKey] || '👗';
+  const categoryInitial = item.category ? item.category.charAt(0).toUpperCase() : '?';
+
   return (
     <>
-      <div className="group relative rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-indigo-500/50 shadow-md hover:shadow-indigo-500/10 transition-all duration-200 overflow-hidden flex flex-col">
+      <div className="group relative rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-indigo-500/50 shadow-md hover:shadow-indigo-500/10 transition-all duration-200 overflow-hidden flex flex-col justify-between">
         {/* Photo Container with fixed 4:5 aspect ratio */}
         <div className="relative aspect-[4/5] w-full bg-slate-900/60 overflow-hidden flex items-center justify-center">
           {!imgError && item.imageUrl ? (
@@ -146,15 +214,21 @@ export default function ItemCard({ item, onDelete }) {
           </div>
         </div>
 
-        {/* Card Details */}
-        <div className="p-3.5 sm:p-4 flex flex-col flex-1 justify-between space-y-2">
+        {/* Card Details & Wear Controls */}
+        <div className="p-3.5 sm:p-4 flex flex-col space-y-2.5">
           <div className="space-y-1">
-            {/* Category */}
-            <div className="text-[11px] font-medium text-indigo-400 uppercase tracking-wider">
-              {item.category}
+            <div className="flex items-center justify-between text-[11px] font-medium text-indigo-400 uppercase tracking-wider">
+              <span>{item.category}</span>
+              <div className="flex items-center space-x-1 text-slate-300 font-normal">
+                <span
+                  className="w-2 h-2 rounded-full inline-block shrink-0"
+                  style={colorStyle}
+                />
+                <span className="capitalize">{item.color}</span>
+              </div>
             </div>
 
-            {/* Name (truncated) */}
+            {/* Name */}
             <h3
               className="text-sm font-semibold text-slate-100 truncate"
               title={item.name}
@@ -163,17 +237,8 @@ export default function ItemCard({ item, onDelete }) {
             </h3>
           </div>
 
-          {/* Color Dot & Name */}
-          <div className="flex items-center space-x-1.5 text-xs text-slate-300">
-            <span
-              className="w-2.5 h-2.5 rounded-full inline-block shadow-sm shrink-0"
-              style={colorStyle}
-            />
-            <span className="truncate capitalize">{item.color}</span>
-          </div>
-
           {/* Season & Occasion Pills */}
-          <div className="flex flex-wrap gap-1 pt-1 text-[11px]">
+          <div className="flex flex-wrap gap-1 text-[11px]">
             <span className="px-2 py-0.5 rounded-md bg-slate-900/90 text-slate-400 border border-slate-700/60 capitalize">
               {item.season}
             </span>
@@ -181,7 +246,96 @@ export default function ItemCard({ item, onDelete }) {
               {item.occasion}
             </span>
           </div>
+
+          {/* Wear Stats Line */}
+          <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px]">
+            <span className="font-medium text-slate-300">
+              Worn {wearCount} {wearCount === 1 ? 'time' : 'times'}
+            </span>
+            <span className="text-slate-400 font-mono text-[10px]">
+              {formatLastWorn(lastWornAt)}
+            </span>
+          </div>
+
+          {/* Wear Action Buttons: "Wore today" + "Pick a date" */}
+          <div className="pt-1 space-y-1.5">
+            <div className="flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={() => handleLogWear()}
+                disabled={isLoggingWear}
+                aria-label={`Log wear for ${item.name}`}
+                className="flex-1 py-1.5 px-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-indigo-200 border border-indigo-500/30 text-xs font-medium transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5"
+              >
+                {isLoggingWear ? (
+                  <div className="w-3.5 h-3.5 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>👔</span>
+                    <span>Wore today</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                title="Pick a custom wear date"
+                aria-label="Pick wear date"
+                className={`p-1.5 rounded-xl border text-xs transition cursor-pointer ${
+                  showDatePicker
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-900/90 text-slate-400 hover:text-slate-200 border-slate-700/80 hover:bg-slate-850'
+                }`}
+              >
+                📅
+              </button>
+            </div>
+
+            {/* Date Picker Input (Capped at today) */}
+            {showDatePicker && (
+              <div className="flex items-center space-x-1.5 p-1.5 rounded-xl bg-slate-900/90 border border-slate-700 animate-in fade-in duration-150">
+                <input
+                  type="date"
+                  max={todayStr}
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="flex-1 px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={!selectedDate || isLoggingWear}
+                  onClick={() => handleLogWear(selectedDate)}
+                  className="py-1 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-medium transition cursor-pointer"
+                >
+                  Log
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Card Toast Notification */}
+        {toast && (
+          <div
+            role="status"
+            className={`absolute bottom-3 left-3 right-3 z-30 p-2.5 rounded-xl text-xs font-medium shadow-2xl border backdrop-blur-md flex items-center justify-between animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+              toast.type === 'warning'
+                ? 'bg-amber-950/95 text-amber-300 border-amber-600/50'
+                : toast.type === 'error'
+                ? 'bg-red-950/95 text-red-300 border-red-600/50'
+                : 'bg-emerald-950/95 text-emerald-300 border-emerald-600/50'
+            }`}
+          >
+            <span className="truncate pr-1">{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="text-slate-400 hover:text-slate-200 text-xs ml-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -209,7 +363,6 @@ export default function ItemCard({ item, onDelete }) {
               </p>
             </div>
 
-            {/* Error in modal if deletion fails */}
             {deleteError && (
               <div
                 role="alert"

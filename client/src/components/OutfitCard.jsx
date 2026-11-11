@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteOutfit } from '../api/outfits.js';
+import { logOutfitWear } from '../api/wear.js';
 
 // Fallback category emojis for items without images
 const CATEGORY_EMOJI = {
@@ -26,8 +27,52 @@ export default function OutfitCard({ outfit, onDelete }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  // Wear logging states
+  const [isLoggingWear, setIsLoggingWear] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [toast, setToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
   const items = outfit.items || [];
   const totalCount = items.length;
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 3200);
+  };
+
+  const handleLogWear = async (customDate) => {
+    setIsLoggingWear(true);
+    try {
+      const dateToLog = customDate || undefined;
+      await logOutfitWear(outfit.id, dateToLog);
+
+      setShowDatePicker(false);
+      setSelectedDate('');
+
+      const label = customDate ? `Logged for ${customDate}` : 'Logged for today';
+      showToast(`✓ Outfit wear ${label.toLowerCase()}!`, 'success');
+    } catch (err) {
+      if (err.status === 409 || err.message?.includes('Already logged')) {
+        showToast('⚠️ Already logged for this day', 'warning');
+      } else {
+        showToast(err.message || 'Failed to log outfit wear', 'error');
+      }
+    } finally {
+      setIsLoggingWear(false);
+    }
+  };
 
   const handleDelete = async () => {
     setDeleteError('');
@@ -51,7 +96,7 @@ export default function OutfitCard({ outfit, onDelete }) {
 
   return (
     <>
-      <div className="group relative rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-indigo-500/50 shadow-md hover:shadow-indigo-500/10 transition-all duration-200 overflow-hidden flex flex-col">
+      <div className="group relative rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-indigo-500/50 shadow-md hover:shadow-indigo-500/10 transition-all duration-200 overflow-hidden flex flex-col justify-between">
         {/* Collage Container (fixed 1:1 square ratio) */}
         <div className="relative aspect-square w-full bg-slate-900/80 p-2 overflow-hidden">
           <div className="grid grid-cols-2 grid-rows-2 gap-1.5 w-full h-full">
@@ -146,7 +191,7 @@ export default function OutfitCard({ outfit, onDelete }) {
         </div>
 
         {/* Card Details */}
-        <div className="p-4 flex flex-col flex-1 justify-between space-y-3">
+        <div className="p-4 flex flex-col space-y-3">
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <h3
@@ -183,7 +228,86 @@ export default function OutfitCard({ outfit, onDelete }) {
               </span>
             )}
           </div>
+
+          {/* Outfit Wear Action Buttons: "Wore today" + "Pick a date" */}
+          <div className="pt-2 border-t border-slate-700/60 space-y-1.5">
+            <div className="flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={() => handleLogWear()}
+                disabled={isLoggingWear}
+                aria-label={`Log wear for outfit ${outfit.name}`}
+                className="flex-1 py-1.5 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-indigo-200 border border-indigo-500/30 text-xs font-medium transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5"
+              >
+                {isLoggingWear ? (
+                  <div className="w-3.5 h-3.5 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>👔</span>
+                    <span>Wore today</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                title="Pick a custom wear date"
+                aria-label="Pick outfit wear date"
+                className={`p-1.5 rounded-xl border text-xs transition cursor-pointer ${
+                  showDatePicker
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-900/90 text-slate-400 hover:text-slate-200 border-slate-700/80 hover:bg-slate-850'
+                }`}
+              >
+                📅
+              </button>
+            </div>
+
+            {/* Date Picker Input (Capped at today) */}
+            {showDatePicker && (
+              <div className="flex items-center space-x-1.5 p-1.5 rounded-xl bg-slate-900/90 border border-slate-700 animate-in fade-in duration-150">
+                <input
+                  type="date"
+                  max={todayStr}
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="flex-1 px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={!selectedDate || isLoggingWear}
+                  onClick={() => handleLogWear(selectedDate)}
+                  className="py-1 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-medium transition cursor-pointer"
+                >
+                  Log
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Card Toast Notification */}
+        {toast && (
+          <div
+            role="status"
+            className={`absolute bottom-3 left-3 right-3 z-30 p-2.5 rounded-xl text-xs font-medium shadow-2xl border backdrop-blur-md flex items-center justify-between animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+              toast.type === 'warning'
+                ? 'bg-amber-950/95 text-amber-300 border-amber-600/50'
+                : toast.type === 'error'
+                ? 'bg-red-950/95 text-red-300 border-red-600/50'
+                : 'bg-emerald-950/95 text-emerald-300 border-emerald-600/50'
+            }`}
+          >
+            <span className="truncate pr-1">{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="text-slate-400 hover:text-slate-200 text-xs ml-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}
@@ -251,4 +375,3 @@ export default function OutfitCard({ outfit, onDelete }) {
     </>
   );
 }
-
