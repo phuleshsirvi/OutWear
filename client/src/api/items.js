@@ -31,11 +31,34 @@ export async function createItem(data) {
 }
 
 /**
- * Fetch all wardrobe items for the authenticated user
+ * Fetch wardrobe items for the authenticated user with optional filters
+ * Sends non-empty filters as a query string (skipping empty/null values)
+ * @param {object} [params] - { search, category, color, season, occasion }
  * @returns {Promise<Array<object>>} List of items
  */
-export async function getItems() {
-  return apiClient('/items', {
+export async function getItems(params = {}) {
+  const query = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      query.append(key, String(value).trim());
+    }
+  }
+
+  const queryString = query.toString();
+  const endpoint = queryString ? `/items?${queryString}` : '/items';
+
+  return apiClient(endpoint, {
+    method: 'GET',
+  });
+}
+
+/**
+ * Fetch filter options (available colors) for the authenticated user
+ * @returns {Promise<{ colors: string[] }>}
+ */
+export async function getFilterOptions() {
+  return apiClient('/items/filters', {
     method: 'GET',
   });
 }
@@ -44,4 +67,5 @@ export default {
   uploadImage,
   createItem,
   getItems,
+  getFilterOptions,
 };
