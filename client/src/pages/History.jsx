@@ -4,25 +4,19 @@ import { getWearHistory, deleteWearLog } from '../api/wear.js';
 
 function formatWearDate(dateStr) {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
+  const str = String(dateStr).slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  const isToday =
-    date.getUTCFullYear() === now.getUTCFullYear() &&
-    date.getUTCMonth() === now.getUTCMonth() &&
-    date.getUTCDate() === now.getUTCDate();
-
-  const yesterday = new Date(now);
+  const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday =
-    date.getUTCFullYear() === yesterday.getUTCFullYear() &&
-    date.getUTCMonth() === yesterday.getUTCMonth() &&
-    date.getUTCDate() === yesterday.getUTCDate();
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-  if (isToday) return 'Today';
-  if (isYesterday) return 'Yesterday';
+  if (str === todayStr) return 'Today';
+  if (str === yesterdayStr) return 'Yesterday';
 
-  return date.toLocaleDateString(undefined, {
+  const [year, month, day] = str.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

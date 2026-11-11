@@ -60,11 +60,20 @@ function getColorStyle(colorStr) {
 
 function formatLastWorn(date) {
   if (!date) return 'Never worn';
+  const str = String(date).slice(0, 10);
   const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+  if (str === todayStr) return 'Worn today';
+  if (str === yesterdayStr) return 'Last worn yesterday';
+
   const worn = new Date(date);
   const diffMs = now.getTime() - worn.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
   if (diffDays <= 0) return 'Worn today';
   if (diffDays === 1) return 'Last worn yesterday';
   return `Last worn ${diffDays} days ago`;
