@@ -108,6 +108,11 @@ export default function Wardrobe() {
     setSearchParams({}, { replace: true });
   }, [setSearchParams]);
 
+  // Remove deleted item from local state without refetching or altering active filters
+  const handleItemDeleted = useCallback((deletedId) => {
+    setItems((prev) => prev.filter((item) => item.id !== deletedId));
+  }, []);
+
   return (
     <div className="w-full space-y-6">
       {/* Success banner if navigated from AddItem */}
@@ -254,7 +259,11 @@ export default function Wardrobe() {
         /* Items Grid */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
           {items.map((item) => (
-            <ItemCard key={item.id} item={item} />
+            <ItemCard
+              key={item.id}
+              item={item}
+              onDelete={handleItemDeleted}
+            />
           ))}
         </div>
       )}

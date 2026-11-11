@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import prisma from '../db.js';
+import cloudinary from '../config/cloudinary.js';
 import { CATEGORIES, SEASONS, OCCASIONS } from '../constants/wardrobe.js';
 
 // Preprocessing helper to trim and lowercase strings
@@ -56,6 +57,9 @@ export const createItemSchema = z.object({
     .nullable()
     .transform((val) => (val && val.length > 0 ? val : null)),
 });
+
+// Update item schema (same fields as create)
+export const updateItemSchema = createItemSchema;
 
 // Validation schema for querying wardrobe items
 export const getItemsQuerySchema = z.object({
@@ -272,6 +276,154 @@ export const getItemById = async (req, res, next) => {
     }
 
     return res.status(200).json(item);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/items/:id
+ * Updates an existing wardrobe item for the authenticated user.
+ * Validates with Zod, cleans up old Cloudinary photo if replaced, and returns the updated item.
+ */
+export const updateItem = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Find item by id and userId (never allow editing another user's item)
+    const existingItem = await prisma.item.findFirst({
+      where: {
+        id,
+        userId: req.user.id,
+      },
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({
+        error: 'Item not found',
+        message: 'Item not found',
+      });
+    }
+
+    // 2. Validate input fields
+    const validationResult = updateItemSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      const issues = validationResult.error.issues || validationResult.error.errors || [];
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: issues.map((err) => ({
+          field: err.path.join('.'),
+          message: err.message,
+        })),
+      });
+    }
+
+    const {
+      name,
+      category,
+      color,
+      season,
+      occasion,
+      fabric,
+      price,
+      imageUrl,
+      imagePublicId,
+    } = validationResult.data;
+
+    // 3. If a new imagePublicId is sent and differs from the old one, delete old Cloudinary image
+    if (
+      existingItem.imagePublicId &&
+      imagePublicId &&
+      existingItem.imagePublicId !== imagePublicId
+    ) {
+      try {
+        await cloudinary.uploader.destroy(existingItem.imagePublicId);
+      } catch (cloudErr) {
+        console.error('Failed to delete old image from Cloudinary:', cloudErr);
+      }
+    }
+
+    // 4. Update the item in PostgreSQL
+    const updatedItem = await prisma.item.update({
+      where: {
+        id,
+      },
+      data: {
+        name,
+        category,
+        color,
+        season,
+        occasion,
+        fabric,
+        price,
+        imageUrl,
+        imagePublicId,
+      },
+    });
+
+    return res.status(200).json(updatedItem);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/items/:id
+ * Deletes a wardrobe item belonging to the authenticated user.
+ * Cleans up associated OutfitItems, WearLogs, and Cloudinary photo.
+ */
+export const deleteItem = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Find item by id and userId
+    const existingItem = await prisma.item.findFirst({
+      where: {
+        id,
+        userId: req.user.id,
+      },
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({
+        error: 'Item not found',
+        message: 'Item not found',
+      });
+    }
+
+    // 2. Remove associated WearLogs and OutfitItems (cascade safeguard)
+    await prisma.wearLog.deleteMany({
+      where: {
+        itemId: id,
+      },
+    });
+
+    await prisma.outfitItem.deleteMany({
+      where: {
+        itemId: id,
+      },
+    });
+
+    // 3. Delete item from database
+    await prisma.item.delete({
+      where: {
+        id,
+      },
+    });
+
+    // 4. Delete image from Cloudinary if present (log failures, do not fail request)
+    if (existingItem.imagePublicId) {
+      try {
+        await cloudinary.uploader.destroy(existingItem.imagePublicId);
+      } catch (cloudErr) {
+        console.error('Failed to delete image from Cloudinary:', cloudErr);
+      }
+    }
+
+    return res.status(200).json({
+      message: 'Item deleted successfully',
+    });
   } catch (error) {
     next(error);
   }

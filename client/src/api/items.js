@@ -63,9 +63,47 @@ export async function getFilterOptions() {
   });
 }
 
+/**
+ * Fetch a single wardrobe item by ID
+ * @param {string} id
+ * @returns {Promise<object>} Item details
+ */
+export async function getItem(id) {
+  return apiClient(`/items/${id}`, {
+    method: 'GET',
+  });
+}
+
+/**
+ * Update an existing wardrobe item
+ * @param {string} id
+ * @param {object} data
+ * @returns {Promise<object>} Updated item
+ */
+export async function updateItem(id, data) {
+  return apiClient(`/items/${id}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+/**
+ * Delete a wardrobe item
+ * @param {string} id
+ * @returns {Promise<{ message: string }>} Success message
+ */
+export async function deleteItem(id) {
+  return apiClient(`/items/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export default {
   uploadImage,
   createItem,
   getItems,
   getFilterOptions,
+  getItem,
+  updateItem,
+  deleteItem,
 };

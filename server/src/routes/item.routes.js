@@ -5,6 +5,8 @@ import {
   getItems,
   getItemFilters,
   getItemById,
+  updateItem,
+  deleteItem,
 } from '../controllers/item.controller.js';
 
 const router = Router();
@@ -18,5 +20,7 @@ router.get('/', getItems);
 // Declared BEFORE /:id so 'filters' is not interpreted as an item ID parameter
 router.get('/filters', getItemFilters);
 router.get('/:id', getItemById);
+router.put('/:id', updateItem);
+router.delete('/:id', deleteItem);
 
 export default router;
