@@ -32,6 +32,7 @@ export default function Navbar() {
     { name: 'Wardrobe', path: '/wardrobe' },
     { name: 'Outfits', path: '/outfits' },
     { name: 'History', path: '/history' },
+    { name: 'Underused', path: '/underused' },
     { name: 'Stats', path: '/stats' },
   ];
 

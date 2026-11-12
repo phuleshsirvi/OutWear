@@ -98,6 +98,25 @@ export async function deleteItem(id) {
   });
 }
 
+/**
+ * Fetch underused items for the authenticated user
+ * @param {object} [params] - { days: 30|60|90, category?: string }
+ * @returns {Promise<{ summary: object, items: Array<object> }>}
+ */
+export async function getUnderused(params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.days) query.append('days', String(params.days));
+  if (params.category && params.category.trim()) {
+    query.append('category', params.category.trim());
+  }
+
+  const qs = query.toString();
+  const endpoint = qs ? `/items/underused?${qs}` : '/items/underused';
+
+  return apiClient(endpoint, { method: 'GET' });
+}
+
 export default {
   uploadImage,
   createItem,
@@ -106,4 +125,5 @@ export default {
   getItem,
   updateItem,
   deleteItem,
+  getUnderused,
 };

@@ -4,6 +4,7 @@ import {
   createItem,
   getItems,
   getItemFilters,
+  getUnderused,
   getItemById,
   updateItem,
   deleteItem,
@@ -17,8 +18,9 @@ router.use(requireAuth);
 // Routes
 router.post('/', createItem);
 router.get('/', getItems);
-// Declared BEFORE /:id so 'filters' is not interpreted as an item ID parameter
+// Declared BEFORE /:id so these paths are not treated as an item ID parameter
 router.get('/filters', getItemFilters);
+router.get('/underused', getUnderused);
 router.get('/:id', getItemById);
 router.put('/:id', updateItem);
 router.delete('/:id', deleteItem);

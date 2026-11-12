@@ -61,6 +61,25 @@ export const createItemSchema = z.object({
 // Update item schema (same fields as create)
 export const updateItemSchema = createItemSchema;
 
+// Validation schema for underused items query
+export const underusedQuerySchema = z.object({
+  days: z.preprocess(
+    (val) => (val === undefined || val === null || val === '' ? 30 : Number(val)),
+    z.union(
+      [z.literal(30), z.literal(60), z.literal(90)],
+      { errorMap: () => ({ message: 'days must be one of: 30, 60, 90' }) }
+    )
+  ),
+  category: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() ? val.trim().toLowerCase() : undefined),
+    z
+      .enum(CATEGORIES, {
+        errorMap: () => ({ message: `Invalid category. Allowed values: ${CATEGORIES.join(', ')}` }),
+      })
+      .optional()
+  ),
+});
+
 // Validation schema for querying wardrobe items
 export const getItemsQuerySchema = z.object({
   search: z
@@ -423,6 +442,140 @@ export const deleteItem = async (req, res, next) => {
 
     return res.status(200).json({
       message: 'Item deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+/**
+ * GET /api/items/underused
+ * Returns the logged-in user's items that are either never worn (lastWornAt is null)
+ * or last worn more than `days` days ago.
+ *
+ * Sort order:
+ *  - Never worn first (sorted by createdAt DESC — newest added first among them)
+ *  - Then by lastWornAt ASC (longest unworn / most neglected first)
+ *
+ * Each item includes: id, name, category, color, imageUrl, wearCount, lastWornAt, createdAt,
+ *   daysSinceWorn (null if never worn), daysOwned (only for never-worn items)
+ *
+ * Also returns a summary: { totalItems, underusedCount, neverWornCount, percentUnused }
+ */
+export const getUnderused = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // Validate query params
+    const validationResult = underusedQuerySchema.safeParse({
+      days: req.query.days,
+      category: req.query.category,
+    });
+
+    if (!validationResult.success) {
+      const issues = validationResult.error.issues || [];
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: issues[0]?.message || 'Invalid query parameters',
+        details: issues.map((e) => ({ field: e.path.join('.'), message: e.message })),
+      });
+    }
+
+    const { days, category } = validationResult.data;
+
+    const now = new Date();
+    const cutoffDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+    // Build where clause
+    const baseWhere = {
+      userId,
+      ...(category ? { category } : {}),
+    };
+
+    // Fetch ALL user items for the summary (with optional category filter)
+    const allUserItems = await prisma.item.findMany({
+      where: baseWhere,
+      select: { id: true, lastWornAt: true },
+    });
+
+    const totalItems = allUserItems.length;
+
+    // Fetch underused items: never worn OR last worn before cutoff
+    const underusedItems = await prisma.item.findMany({
+      where: {
+        ...baseWhere,
+        OR: [
+          { lastWornAt: null },
+          { lastWornAt: { lt: cutoffDate } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        color: true,
+        imageUrl: true,
+        wearCount: true,
+        lastWornAt: true,
+        createdAt: true,
+      },
+    });
+
+    // Annotate each item with computed fields
+    const annotated = underusedItems.map((item) => {
+      const isNeverWorn = item.lastWornAt === null;
+
+      const daysSinceWorn = isNeverWorn
+        ? null
+        : Math.floor((now.getTime() - new Date(item.lastWornAt).getTime()) / (1000 * 60 * 60 * 24));
+
+      const daysOwned = isNeverWorn
+        ? Math.floor((now.getTime() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+        : undefined;
+
+      return {
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        color: item.color,
+        imageUrl: item.imageUrl,
+        wearCount: item.wearCount,
+        lastWornAt: item.lastWornAt,
+        createdAt: item.createdAt,
+        daysSinceWorn,
+        ...(isNeverWorn ? { daysOwned } : {}),
+      };
+    });
+
+    // Sort: never worn first (by createdAt DESC), then by lastWornAt ASC
+    annotated.sort((a, b) => {
+      const aIsNever = a.lastWornAt === null;
+      const bIsNever = b.lastWornAt === null;
+
+      if (aIsNever && bIsNever) {
+        // Both never worn: newest added first
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (aIsNever) return -1; // a (never worn) comes before b
+      if (bIsNever) return 1;  // b (never worn) comes before a
+
+      // Both have lastWornAt: longest unworn first (ascending)
+      return new Date(a.lastWornAt).getTime() - new Date(b.lastWornAt).getTime();
+    });
+
+    const underusedCount = annotated.length;
+    const neverWornCount = annotated.filter((i) => i.lastWornAt === null).length;
+    const percentUnused = totalItems === 0 ? 0 : Math.round((underusedCount / totalItems) * 100);
+
+    return res.status(200).json({
+      summary: {
+        totalItems,
+        underusedCount,
+        neverWornCount,
+        percentUnused,
+      },
+      items: annotated,
     });
   } catch (error) {
     next(error);

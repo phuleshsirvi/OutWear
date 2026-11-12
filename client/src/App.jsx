@@ -13,6 +13,7 @@ import EditItem from './pages/EditItem.jsx';
 import Outfits from './pages/Outfits.jsx';
 import OutfitBuilder from './pages/OutfitBuilder.jsx';
 import History from './pages/History.jsx';
+import Underused from './pages/Underused.jsx';
 import Stats from './pages/Stats.jsx';
 import NotFound from './pages/NotFound.jsx';
 
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="/outfits/new" element={<OutfitBuilder />} />
               <Route path="/outfits/:id/edit" element={<OutfitBuilder />} />
               <Route path="/history" element={<History />} />
+              <Route path="/underused" element={<Underused />} />
               <Route path="/stats" element={<Stats />} />
             </Route>
           </Route>
