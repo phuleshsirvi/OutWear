@@ -31,6 +31,7 @@ export default function Navbar() {
   const navItems = [
     { name: 'Wardrobe', path: '/wardrobe' },
     { name: 'Outfits', path: '/outfits' },
+    { name: 'Suggest', path: '/suggest' },
     { name: 'History', path: '/history' },
     { name: 'Underused', path: '/underused' },
     { name: 'Stats', path: '/stats' },
