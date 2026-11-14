@@ -22,7 +22,7 @@ export default function Navbar() {
   };
 
   const navLinkClass = ({ isActive }) =>
-    `px-3.5 py-2 rounded-xl text-sm font-medium transition flex items-center ${
+    `px-2.5 lg:px-3.5 py-2 rounded-xl text-xs lg:text-sm font-medium transition flex items-center whitespace-nowrap ${
       isActive
         ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-sm shadow-indigo-500/10'
         : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 border border-transparent'
@@ -32,6 +32,7 @@ export default function Navbar() {
     { name: 'Wardrobe', path: '/wardrobe' },
     { name: 'Outfits', path: '/outfits' },
     { name: 'Suggest', path: '/suggest' },
+    { name: 'Before you buy', path: '/before-you-buy' },
     { name: 'History', path: '/history' },
     { name: 'Underused', path: '/underused' },
     { name: 'Stats', path: '/stats' },

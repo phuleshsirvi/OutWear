@@ -12,6 +12,7 @@ import outfitRoutes from './routes/outfit.routes.js';
 import wearRoutes from './routes/wear.routes.js';
 import statsRoutes from './routes/stats.routes.js';
 import suggestionRoutes from './routes/suggestion.routes.js';
+import duplicateRoutes from './routes/duplicate.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +53,7 @@ app.use('/api/outfits', outfitRoutes);
 app.use('/api/wear', wearRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/suggestions', suggestionRoutes);
+app.use('/api/duplicates', duplicateRoutes);
 
 // Root fallback endpoint
 app.get('/', (req, res) => {

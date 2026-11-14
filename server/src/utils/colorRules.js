@@ -147,11 +147,76 @@ export function getColorPairReason(colorA, colorB) {
   return `Balanced color contrast (${capA} & ${capB})`;
 }
 
+// Small editable alias map for close color names
+export const COLOR_ALIASES = {
+  'dark blue': 'navy',
+  'navy blue': 'navy',
+  'grey': 'gray',
+  'burgundy': 'maroon',
+  'wine': 'maroon',
+};
+
+/**
+ * Normalizes a color string and resolves known aliases
+ */
+export function normalizeColor(colorStr) {
+  if (!colorStr || typeof colorStr !== 'string') return '';
+  const trimmed = colorStr.trim().toLowerCase();
+  return COLOR_ALIASES[trimmed] || trimmed;
+}
+
+/**
+ * Returns true if colorA and colorB belong to the same color family
+ * and that family is known (neutral, warm, cool).
+ */
+export function sameColorFamily(colorA, colorB) {
+  const familyA = getColorFamily(colorA);
+  const familyB = getColorFamily(colorB);
+  if (!familyA || !familyB) return false;
+  return familyA === familyB;
+}
+
+/**
+ * Returns color similarity between two colors:
+ * - 1.0 for the same color (including aliases)
+ * - 0.7 for the same non-neutral family
+ * - 0 otherwise
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number} 1.0, 0.7, or 0
+ */
+export function colorSimilarity(a, b) {
+  const normA = normalizeColor(a);
+  const normB = normalizeColor(b);
+
+  if (!normA || !normB) return 0;
+
+  // Exact same color (or alias)
+  if (normA === normB) {
+    return 1.0;
+  }
+
+  // Same non-neutral family (e.g. warm or cool)
+  const familyA = getColorFamily(normA);
+  const familyB = getColorFamily(normB);
+
+  if (familyA && familyB && familyA === familyB && familyA !== 'neutral') {
+    return 0.7;
+  }
+
+  return 0;
+}
+
 export default {
   FAMILIES,
   COLOR_FAMILY_MAP,
+  COLOR_ALIASES,
   getColorFamily,
   colorScore,
   getColorPairReason,
+  normalizeColor,
+  sameColorFamily,
+  colorSimilarity,
 };
 
