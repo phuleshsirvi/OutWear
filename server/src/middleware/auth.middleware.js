@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
+import env from '../config/env.js';
 
 /**
  * Authentication middleware
@@ -24,7 +25,7 @@ export const requireAuth = async (req, res, next) => {
     }
 
     // 2. Verify token
-    const JWT_SECRET = process.env.JWT_SECRET || 'outwear_jwt_secret_dev_key';
+    const JWT_SECRET = env.JWT_SECRET || process.env.JWT_SECRET || 'outwear_jwt_secret_dev_key';
 
     let decoded;
     try {

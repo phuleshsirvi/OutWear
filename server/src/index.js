@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import helmet from 'helmet';
+import compression from 'compression';
+import crypto from 'crypto';
+
+import env from './config/env.js';
+import { apiLimiter } from './middleware/rateLimit.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 import authRoutes from './routes/auth.routes.js';
 import itemRoutes from './routes/item.routes.js';
@@ -13,39 +17,74 @@ import wearRoutes from './routes/wear.routes.js';
 import statsRoutes from './routes/stats.routes.js';
 import suggestionRoutes from './routes/suggestion.routes.js';
 import duplicateRoutes from './routes/duplicate.routes.js';
-import { errorHandler } from './middleware/errorHandler.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load environment variables (.env in server or root fallback)
-dotenv.config();
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = env.PORT || 4000;
 
-// Middleware
+// 1. Security & Proxy Configuration
+app.disable('x-powered-by');
+
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // Enable proxy trust behind Render / reverse proxies
+}
+
+// 2. Security headers (before all routes)
+app.use(helmet());
+
+// 3. Response compression
+app.use(compression());
+
+// 4. Request ID tagging
+app.use((req, res, next) => {
+  req.id = req.headers['x-request-id'] || crypto.randomUUID();
+  res.setHeader('x-request-id', req.id);
+  next();
+});
+
+// 5. Strict CORS Configuration (no wildcards)
+const allowedOrigins = (env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, mobile apps, server-to-server) or matching origin
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
   })
 );
-app.use(express.json());
+
+// 6. Request hardening: 100kb payload limit & reject malformed JSON
+app.use(express.json({ limit: '100kb' }));
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON', requestId: req.id });
+  }
+  next(err);
+});
+
+// 7. Cookie Parser
 app.use(cookieParser());
 
-// Health check endpoint
+// 8. Health check endpoint (does NOT touch the database)
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
-    message: 'OutWear server is healthy',
-    timestamp: new Date().toISOString(),
-    port: PORT,
+    uptime: process.uptime(),
   });
 });
 
-// API Routes
+// 9. General Rate Limiter (300 requests per 15 min on /api, skips auth & uploads which have dedicated limits)
+app.use('/api', apiLimiter);
+
+// 10. API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/uploads', uploadRoutes);
@@ -55,7 +94,12 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/suggestions', suggestionRoutes);
 app.use('/api/duplicates', duplicateRoutes);
 
-// Root fallback endpoint
+// 11. 404 handler for unknown /api routes
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+// 12. Root fallback endpoint
 app.get('/', (req, res) => {
   res.json({
     name: 'OutWear API',
@@ -64,10 +108,13 @@ app.get('/', (req, res) => {
   });
 });
 
-// Central Error Handler (must be mounted after all routes)
+// 13. Centralized Error Handler (must be mounted after all routes)
 app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`OutWear server running on port ${PORT}`);
   console.log(`Health check available at http://localhost:${PORT}/api/health`);
 });
+
+export { app };
+export default app;

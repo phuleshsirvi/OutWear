@@ -39,6 +39,7 @@ export default function OutfitBuilder() {
   const [wardrobeItems, setWardrobeItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
 
   // Search & Category filter inside the builder
   const [search, setSearch] = useState('');
@@ -86,7 +87,7 @@ export default function OutfitBuilder() {
     return () => {
       isMounted = false;
     };
-  }, [id, isEdit]);
+  }, [id, isEdit, retryCount]);
 
   // Selected item IDs set for fast O(1) membership checks
   const selectedItemIds = useMemo(() => {
@@ -192,8 +193,11 @@ export default function OutfitBuilder() {
             <h2 className="text-xl font-bold font-heading text-[#1E2140]">Unable to Open Builder</h2>
             <p className="text-[#6B7194] text-sm">{loadError}</p>
           </div>
-          <div className="pt-2">
-            <Button as={Link} to="/outfits" variant="primary">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button variant="primary" onClick={() => setRetryCount((c) => c + 1)}>
+              Try again
+            </Button>
+            <Button as={Link} to="/outfits" variant="secondary">
               ← Back to Outfits
             </Button>
           </div>

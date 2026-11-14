@@ -58,6 +58,8 @@ function PageTitleTracker() {
       title = 'Underused Clothes · OutWear';
     } else if (path === '/stats') {
       title = 'Wardrobe Analytics · OutWear';
+    } else {
+      title = 'Page Not Found · OutWear';
     }
 
     document.title = title;

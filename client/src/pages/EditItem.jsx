@@ -11,6 +11,7 @@ export default function EditItem() {
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
 
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,7 +49,7 @@ export default function EditItem() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, retryCount]);
 
   const handleSubmit = async ({ formData, imageFile }) => {
     setSubmitError('');
@@ -107,11 +108,18 @@ export default function EditItem() {
             <h2 className="text-xl font-bold font-heading text-[#1E2140]">Item Not Found</h2>
             <p className="text-[#6B7194] text-sm">{loadError || 'The requested item could not be found.'}</p>
           </div>
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setRetryCount((c) => c + 1)}
+            >
+              Try again
+            </Button>
             <Button
               as={Link}
               to="/wardrobe"
-              variant="primary"
+              variant="secondary"
               size="md"
             >
               ← Back to Wardrobe

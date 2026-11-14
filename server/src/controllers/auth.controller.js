@@ -2,18 +2,34 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import prisma from '../db.js';
+import env from '../config/env.js';
 
-// Cookie configuration options
-const getCookieOptions = () => ({
-  httpOnly: true,
-  sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-});
+// Precomputed 12-round bcrypt hash used to equalize execution time when a user does not exist
+const DUMMY_HASH = '$2a$12$e8uq0e1t.4W6Gv7yY3fV3OBk3cZc58M8hR58w2Yv28P2C.wE1Xf9W';
+
+// Cookie configuration options depending on NODE_ENV
+const getCookieOptions = () => {
+  const isProd = (env.NODE_ENV || process.env.NODE_ENV) === 'production';
+  return {
+    httpOnly: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+  };
+};
+
+const getClearCookieOptions = () => {
+  const isProd = (env.NODE_ENV || process.env.NODE_ENV) === 'production';
+  return {
+    httpOnly: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
+  };
+};
 
 // Helper to create 7-day JWT
 const createToken = (userId) => {
-  const secret = process.env.JWT_SECRET || 'outwear_jwt_secret_dev_key';
+  const secret = env.JWT_SECRET || process.env.JWT_SECRET || 'outwear_jwt_secret_dev_key';
   return jwt.sign({ id: userId, userId }, secret, {
     expiresIn: '7d',
   });
@@ -32,7 +48,8 @@ export const registerSchema = z.object({
     .toLowerCase(),
   password: z
     .string({ required_error: 'Password is required' })
-    .min(8, 'Password must be at least 8 characters'),
+    .min(8, 'Password must be at least 8 characters')
+    .max(72, 'Password cannot exceed 72 characters'),
 });
 
 // Zod validation schema for user login
@@ -44,14 +61,15 @@ export const loginSchema = z.object({
     .toLowerCase(),
   password: z
     .string({ required_error: 'Password is required' })
-    .min(1, 'Password is required'),
+    .min(1, 'Password is required')
+    .max(72, 'Password cannot exceed 72 characters'),
 });
 
 /**
  * POST /api/auth/register
  * Accepts name, email, password
- * Validates input, checks duplicate email, hashes password, saves with Prisma,
- * sets httpOnly auth cookie, and returns id, name, and email only.
+ * Validates input, checks duplicate email, hashes password with bcrypt (cost factor 12),
+ * saves with Prisma, sets httpOnly auth cookie, and returns id, name, and email only.
  */
 export const register = async (req, res, next) => {
   try {
@@ -82,8 +100,8 @@ export const register = async (req, res, next) => {
       });
     }
 
-    // 3. Hash the password with bcryptjs
-    const salt = await bcrypt.genSalt(10);
+    // 3. Hash the password with bcryptjs at cost factor 12
+    const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
     // 4. Save user with Prisma
@@ -104,7 +122,7 @@ export const register = async (req, res, next) => {
     const token = createToken(user.id);
     res.cookie('token', token, getCookieOptions());
 
-    // 6. Return id, name, and email only
+    // 6. Return id, name, and email only (never return passwordHash)
     return res.status(201).json({
       id: user.id,
       name: user.name,
@@ -118,7 +136,7 @@ export const register = async (req, res, next) => {
 /**
  * POST /api/auth/login
  * Accepts email, password
- * Validates input, lowercases email, verifies credentials with bcryptjs,
+ * Validates input, lowercases email, verifies credentials against database or dummy hash,
  * sets httpOnly auth cookie, and returns id, name, and email only.
  */
 export const login = async (req, res, next) => {
@@ -144,20 +162,13 @@ export const login = async (req, res, next) => {
       where: { email },
     });
 
-    if (!user) {
+    // 3. Compare password with bcryptjs (use DUMMY_HASH if user not found to prevent timing-based user enumeration)
+    const hashToCompare = user ? user.passwordHash : DUMMY_HASH;
+    const isMatch = await bcrypt.compare(password, hashToCompare);
+
+    if (!user || !isMatch) {
       return res.status(401).json({
         error: 'Invalid email or password',
-        message: 'Invalid email or password',
-      });
-    }
-
-    // 3. Compare password with bcryptjs
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        error: 'Invalid email or password',
-        message: 'Invalid email or password',
       });
     }
 
@@ -178,14 +189,10 @@ export const login = async (req, res, next) => {
 
 /**
  * POST /api/auth/logout
- * Clears the auth cookie and returns a success message
+ * Clears the auth cookie with matching environment options and returns success
  */
 export const logout = async (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  });
+  res.clearCookie('token', getClearCookieOptions());
 
   return res.status(200).json({
     message: 'Logged out successfully',
