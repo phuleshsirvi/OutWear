@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { Sparkles, ChevronLeft, ChevronRight, RotateCcw, Check, Bookmark, ArrowLeft, AlertCircle } from 'lucide-react';
 import { OCCASIONS, SEASONS } from '../constants/wardrobe.js';
 import { getSuggestions } from '../api/suggestions.js';
 import { logItemWear } from '../api/wear.js';
 import { createOutfit } from '../api/outfits.js';
+import { getColorInfo } from '../constants/colors.js';
+import { Button, Badge, Toast, EmptyState, Skeleton, Select, IconButton } from '../components/ui/index.js';
 
 // Fallback category emojis
 const CATEGORY_EMOJI = {
@@ -16,49 +19,71 @@ const CATEGORY_EMOJI = {
   accessory: '👜',
 };
 
-// Common color to hex mapping for small dot indicators
-const COLOR_HEX_MAP = {
-  black: '#0f172a',
-  white: '#f8fafc',
-  red: '#ef4444',
-  blue: '#3b82f6',
-  green: '#22c55e',
-  yellow: '#eab308',
-  pink: '#ec4899',
-  purple: '#a855f7',
-  orange: '#f97316',
-  brown: '#78350f',
-  grey: '#6b7280',
-  gray: '#6b7280',
-  beige: '#e2d5c3',
-  navy: '#1e3a8a',
-  maroon: '#800000',
-  cream: '#fffdd0',
-  olive: '#556b2f',
-  teal: '#0d9488',
-  lavender: '#e6e6fa',
-  tan: '#d2b48c',
-  khaki: '#c3b091',
-  coral: '#ff7f50',
-  gold: '#ffd700',
-  silver: '#c0c0c0',
-  charcoal: '#333333',
-  burgundy: '#800020',
-};
-
-function getColorDot(colorStr) {
-  if (!colorStr) return '#94a3b8';
-  const norm = colorStr.toLowerCase().trim();
-  return COLOR_HEX_MAP[norm] || '#94a3b8';
-}
+// Pastel accent variants for reason chips
+const REASON_VARIANTS = ['lavender', 'blue', 'green', 'amber'];
 
 function capitalize(str) {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+function formatLabel(str) {
+  if (!str) return '';
+  return str.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('-');
+}
+
+/**
+ * Circular progress ring component showing outfit score
+ */
+function ScoreRing({ score = 0, size = 52, strokeWidth = 4 }) {
+  const pct = Math.round(score * 100);
+  const radius = (size - strokeWidth * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct / 100) * circumference;
+
+  return (
+    <div
+      className="relative inline-flex items-center justify-center shrink-0 select-none"
+      style={{ width: size, height: size }}
+      title={`Outfit harmony score: ${pct}%`}
+    >
+      <svg className="-rotate-90" width={size} height={size}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#E3E6FB"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#4F5BD5"
+          className="transition-all duration-700 ease-out"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          fill="transparent"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <span className="text-xs font-extrabold font-mono text-[#1E2140] leading-none">
+          {pct}%
+        </span>
+        <span className="text-[8px] text-[#4F5BD5] font-bold tracking-tighter uppercase leading-none mt-0.5">
+          Match
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function Suggest() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const carouselRef = useRef(null);
 
   // Read occasion and season from URL query string
   const occasionParam = searchParams.get('occasion') || '';
@@ -76,7 +101,7 @@ export default function Suggest() {
   const [error, setError] = useState(null);
 
   // Per-outfit action state indicators
-  const [actionStates, setActionStates] = useState({}); // { [outfitIdx]: { wearing: bool, worn: bool, saving: bool, saved: bool } }
+  const [actionStates, setActionStates] = useState({});
 
   // Floating toast notification state
   const [toast, setToast] = useState(null);
@@ -140,7 +165,14 @@ export default function Suggest() {
   // Initial fetch on mount or when URL params change
   useEffect(() => {
     fetchSuggestions(occasionParam, seasonParam, excludeIds);
-  }, [occasionParam, seasonParam, fetchSuggestions]);
+  }, [occasionParam, seasonParam, fetchSuggestions, excludeIds]);
+
+  // Scroll controls for desktop carousel
+  const scrollCarousel = (direction) => {
+    if (!carouselRef.current) return;
+    const scrollAmount = direction === 'left' ? -480 : 480;
+    carouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  };
 
   // Handle filter submission
   const handleFilterSubmit = (e) => {
@@ -150,7 +182,7 @@ export default function Suggest() {
     if (season) newParams.season = season;
 
     setSearchParams(newParams);
-    setExcludeIds([]); // Reset exclusions on explicit filter search
+    setExcludeIds([]);
     fetchSuggestions(occasion, season, []);
   };
 
@@ -207,7 +239,6 @@ export default function Suggest() {
     }));
 
     try {
-      // Log wear for all items in this outfit
       const promises = targetOutfit.items.map((it) => logItemWear(it.id));
       await Promise.allSettled(promises);
 
@@ -238,8 +269,8 @@ export default function Suggest() {
 
     try {
       const defaultName = occasion
-        ? `${capitalize(occasion)} look`
-        : `Suggested look #${outfitIndex + 1}`;
+        ? `${capitalize(occasion)} Look`
+        : `Suggested Look #${outfitIndex + 1}`;
 
       await createOutfit({
         name: defaultName,
@@ -263,159 +294,142 @@ export default function Suggest() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 font-sans animate-fade-in-up">
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce-short">
-          <div
-            className={`px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2 text-sm font-medium border backdrop-blur-md ${
-              toast.type === 'error'
-                ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
-                : toast.type === 'info'
-                ? 'bg-sky-950/90 border-sky-500/50 text-sky-200'
-                : 'bg-indigo-950/90 border-indigo-500/50 text-indigo-100 shadow-indigo-500/20'
-            }`}
-          >
-            <span>{toast.type === 'error' ? '⚠️' : toast.type === 'info' ? 'ℹ️' : '✨'}</span>
-            <span>{toast.message}</span>
-          </div>
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-purple-300 via-indigo-100 to-indigo-300 bg-clip-text text-transparent flex items-center gap-2.5">
-            <span>✨</span> Outfit Suggestions
+          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading tracking-tight text-[#1E2140] flex items-center gap-2.5">
+            <Sparkles className="w-7 h-7 text-[#4F5BD5]" />
+            <span>Outfit Suggestions</span>
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-xs sm:text-sm text-[#6B7194] mt-1 font-sans">
             Smart wardrobe combinations scored by color harmony, occasion, and freshness
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Link
-            to="/outfits"
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition"
-          >
-            My Outfits
-          </Link>
-          <Link
-            to="/wardrobe"
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition"
-          >
+        <div className="flex items-center space-x-2">
+          <Button as={Link} to="/outfits" variant="secondary" size="sm" className="gap-1.5">
+            <ArrowLeft className="w-4 h-4" />
+            <span>My Outfits</span>
+          </Button>
+          <Button as={Link} to="/wardrobe" variant="ghost" size="sm">
             Wardrobe
-          </Link>
+          </Button>
         </div>
       </div>
 
       {/* Missing Category Notice */}
       {missing.length > 0 && (
-        <div className="rounded-2xl bg-amber-950/40 border border-amber-500/30 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-200">
+        <div className="rounded-3xl bg-[#FCEBD0]/90 border border-[#F5C98A] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[#9A6410] backdrop-blur-xl shadow-xs">
           <div className="flex items-center space-x-3 text-sm">
-            <span className="text-xl">💡</span>
+            <span className="text-2xl">💡</span>
             <span>
-              Add <strong className="font-semibold capitalize text-amber-100">{missing.join(', ')}</strong> to complete full outfits with shoes & bottoms.
+              Add <strong className="font-bold capitalize text-[#1E2140]">{missing.join(', ')}</strong> to unlock more complete looks with shoes & bottoms.
             </span>
           </div>
-          <Link
-            to="/wardrobe/add"
-            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 transition flex-shrink-0"
-          >
+          <Button as={Link} to="/wardrobe/add" variant="secondary" size="sm" className="shrink-0">
             + Add item
-          </Link>
+          </Button>
         </div>
       )}
 
       {/* Exclusions active indicator */}
       {excludeIds.length > 0 && (
-        <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-xl">
+        <div className="flex items-center justify-between text-xs text-[#6B7194] bg-white/70 border border-white/80 px-4 py-2.5 rounded-2xl shadow-xs backdrop-blur-md">
           <span>
-            {excludeIds.length} item{excludeIds.length === 1 ? '' : 's'} temporarily excluded from suggestions
+            {excludeIds.length} {excludeIds.length === 1 ? 'item' : 'items'} temporarily excluded from suggestions
           </span>
           <button
+            type="button"
             onClick={handleResetExclusions}
-            className="text-indigo-400 hover:text-indigo-300 font-medium underline cursor-pointer"
+            className="text-[#4F5BD5] hover:text-[#3B5FB0] font-bold underline cursor-pointer"
           >
             Reset exclusions
           </button>
         </div>
       )}
 
-      {/* Filters Form */}
+      {/* Filters Form with Selects and Indigo "Suggest Outfit" Button */}
       <form
         onSubmit={handleFilterSubmit}
-        className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-end gap-3.5"
+        className="bg-white/75 border border-white/70 rounded-3xl p-5 sm:p-6 shadow-[0_10px_35px_rgba(99,102,241,0.08)] flex flex-col sm:flex-row sm:items-end gap-4 backdrop-blur-xl"
       >
         {/* Occasion Select */}
-        <div className="flex-1 space-y-1.5">
-          <label htmlFor="occasion-select" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            Occasion
-          </label>
-          <select
+        <div className="flex-1">
+          <Select
             id="occasion-select"
+            label="Occasion"
             value={occasion}
             onChange={(e) => setOccasion(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700/80 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            aria-label="Filter by occasion"
           >
             <option value="">Any Occasion</option>
             {OCCASIONS.map((occ) => (
               <option key={occ} value={occ}>
-                {capitalize(occ)}
+                {formatLabel(occ)}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Season Select */}
-        <div className="flex-1 space-y-1.5">
-          <label htmlFor="season-select" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-            Season
-          </label>
-          <select
+        <div className="flex-1">
+          <Select
             id="season-select"
+            label="Season"
             value={season}
             onChange={(e) => setSeason(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700/80 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            aria-label="Filter by season"
           >
             <option value="">Any Season</option>
             {SEASONS.map((sea) => (
               <option key={sea} value={sea}>
-                {capitalize(sea)}
+                {formatLabel(sea)}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
-        {/* Submit Button */}
-        <div className="sm:flex-shrink-0">
-          <button
+        {/* Indigo "Suggest outfit" Button with Sparkle Icon */}
+        <div className="sm:shrink-0">
+          <Button
             type="submit"
-            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+            variant="primary"
+            size="md"
+            className="w-full sm:w-auto shadow-[0_4px_16px_rgba(79,91,213,0.25)] font-bold gap-2"
           >
-            <span>✨</span>
-            <span>Suggest outfit</span>
-          </button>
+            <Sparkles className="w-4 h-4" />
+            <span>Suggest Outfit</span>
+          </Button>
         </div>
       </form>
 
       {/* Loading Skeleton */}
       {loading && (
-        <div className="space-y-6 animate-pulse">
+        <div className="flex items-stretch gap-6 overflow-hidden">
           {[...Array(2)].map((_, i) => (
             <div
               key={i}
-              className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-5"
+              className="w-[88vw] sm:w-[500px] shrink-0 bg-white/70 border border-white/60 rounded-3xl p-6 space-y-5 shadow-xs"
             >
               <div className="flex items-center justify-between">
-                <div className="h-6 w-36 bg-slate-800 rounded-lg" />
-                <div className="h-6 w-20 bg-slate-800 rounded-lg" />
+                <Skeleton className="h-6 w-44 rounded-xl" />
+                <Skeleton className="h-12 w-12 rounded-full" />
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div className="flex space-x-3 overflow-hidden">
                 {[...Array(3)].map((_, j) => (
-                  <div key={j} className="h-44 bg-slate-800/60 rounded-xl" />
+                  <Skeleton key={j} className="h-44 w-32 rounded-2xl shrink-0" />
                 ))}
               </div>
-              <div className="h-8 w-64 bg-slate-800/40 rounded-xl" />
+              <Skeleton className="h-10 w-full rounded-2xl" />
             </div>
           ))}
         </div>
@@ -423,208 +437,242 @@ export default function Suggest() {
 
       {/* Error State */}
       {!loading && error && (
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
-          <div className="w-16 h-16 mx-auto rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl">
-            ⚠️
+        <div className="max-w-md mx-auto py-16 text-center space-y-4 font-sans animate-fade-in-up">
+          <div className="rounded-3xl bg-white/75 border border-white/70 backdrop-blur-xl p-8 shadow-[0_10px_40px_rgba(99,102,241,0.08)] space-y-4">
+            <div className="w-14 h-14 rounded-full bg-[#FBE3DC] text-[#C2492E] flex items-center justify-center mx-auto shadow-xs">
+              <AlertCircle className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold font-heading text-[#1E2140]">
+                Unable to Generate Suggestions
+              </h2>
+              <p className="text-xs sm:text-sm text-[#6B7194]">{error}</p>
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => fetchSuggestions(occasion, season, excludeIds)}
+            >
+              Try again
+            </Button>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-xl sm:text-2xl font-bold text-white">
-              Unable to Generate Suggestions
-            </h2>
-            <p className="text-slate-400 text-sm max-w-md mx-auto">{error}</p>
-          </div>
-          <button
-            onClick={() => fetchSuggestions(occasion, season, excludeIds)}
-            className="inline-flex items-center px-5 py-2.5 rounded-xl font-medium text-sm bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition cursor-pointer"
-          >
-            Try again
-          </button>
         </div>
       )}
 
-      {/* Not Enough Items / Empty State */}
+      {/* Empty State */}
       {!loading && !error && outfits.length === 0 && (
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
-          <div className="w-20 h-20 mx-auto rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center text-4xl shadow-lg shadow-indigo-500/10">
-            ✨
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              {emptyMessage || 'No Outfits Found'}
-            </h2>
-            <p className="text-slate-400 text-sm sm:text-base max-w-md mx-auto">
-              {excludeIds.length > 0
-                ? 'All available pieces are currently in the excluded list.'
-                : 'Add more tops, bottoms, dresses, or shoes to generate harmonious outfit suggestions.'}
-            </p>
-          </div>
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-            {excludeIds.length > 0 && (
-              <button
+        <EmptyState
+          icon="✨"
+          title={emptyMessage || 'No Outfits Found'}
+          description={
+            excludeIds.length > 0
+              ? 'All available pieces are currently in the excluded list.'
+              : 'Add more tops, bottoms, dresses, or shoes to generate harmonious outfit suggestions.'
+          }
+          actionText="Add wardrobe item"
+          actionLink="/wardrobe/add"
+          actionAs={Link}
+        >
+          {excludeIds.length > 0 && (
+            <div className="pt-2">
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleResetExclusions}
-                className="px-5 py-2.5 rounded-xl font-medium text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
               >
                 Reset excluded items
-              </button>
-            )}
-            <Link
-              to="/wardrobe/add"
-              className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/25 transition cursor-pointer"
-            >
-              <span>➕</span>
-              <span>Add wardrobe item</span>
-            </Link>
-          </div>
-        </div>
+              </Button>
+            </div>
+          )}
+        </EmptyState>
       )}
 
-      {/* Suggested Outfits List */}
+      {/* OUTFIT RESULTS: HORIZONTAL ROW OF GLASS CARDS (CAROUSEL WITH ARROWS ON DESKTOP, SWIPE ON MOBILE) */}
       {!loading && !error && outfits.length > 0 && (
-        <div className="space-y-6">
-          {outfits.map((outfit, index) => {
-            const outfitState = actionStates[index] || {};
-            const matchScorePct = Math.round((outfit.score || 0) * 100);
+        <div className="space-y-3">
+          {/* Carousel Header with Navigation Arrows on Desktop */}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#6B7194] font-heading">
+                Recommended Looks ({outfits.length})
+              </span>
+              <span className="text-xs text-[#6B7194]">· Swipe or scroll to explore</span>
+            </div>
 
-            return (
-              <div
-                key={index}
-                className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5 relative overflow-hidden group hover:border-slate-700 transition"
+            {/* Desktop Navigation Arrows */}
+            <div className="hidden sm:flex items-center gap-2">
+              <IconButton
+                onClick={() => scrollCarousel('left')}
+                aria-label="Previous outfit suggestion"
+                size="sm"
               >
-                {/* Outfit Card Top Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-2 border-b border-slate-800/80">
-                  <div className="flex items-center space-x-3">
-                    <span className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-sm font-bold">
-                      #{index + 1}
-                    </span>
-                    <div>
-                      <h2 className="text-base sm:text-lg font-bold text-white">
-                        {occasion ? `${capitalize(occasion)} Outfit` : `Suggested Outfit #${index + 1}`}
-                      </h2>
-                      <div className="text-xs text-slate-400">
-                        {outfit.items.length} pieces coordinated
+                <ChevronLeft className="w-4 h-4 text-[#1E2140]" />
+              </IconButton>
+              <IconButton
+                onClick={() => scrollCarousel('right')}
+                aria-label="Next outfit suggestion"
+                size="sm"
+              >
+                <ChevronRight className="w-4 h-4 text-[#1E2140]" />
+              </IconButton>
+            </div>
+          </div>
+
+          {/* Carousel Scroll Container */}
+          <div
+            ref={carouselRef}
+            className="flex items-stretch gap-5 sm:gap-6 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scrollbar-none px-1"
+          >
+            {outfits.map((outfit, index) => {
+              const outfitState = actionStates[index] || {};
+
+              return (
+                <div
+                  key={index}
+                  className="snap-start shrink-0 w-[90vw] sm:w-[480px] lg:w-[540px] bg-white/75 border border-white/70 hover:border-white rounded-3xl p-5 sm:p-6 shadow-[0_10px_35px_rgba(99,102,241,0.08)] hover:shadow-[0_14px_45px_rgba(99,102,241,0.14)] backdrop-blur-xl flex flex-col justify-between space-y-5 transition-all duration-300 font-sans"
+                >
+                  {/* Card Header with Score Ring */}
+                  <div className="flex items-center justify-between gap-4 pb-3 border-b border-[#E3E6FB]/80">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <span className="w-8 h-8 rounded-xl bg-[#E3E6FB] text-[#4F5BD5] flex items-center justify-center text-xs font-black font-mono shadow-xs shrink-0">
+                        #{index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <h2 className="text-base sm:text-lg font-bold font-heading text-[#1E2140] truncate">
+                          {occasion ? `${capitalize(occasion)} Outfit` : `Curated Look #${index + 1}`}
+                        </h2>
+                        <div className="flex items-center space-x-2 mt-0.5">
+                          <Badge variant="primary" size="sm">
+                            {outfit.items.length} pieces coordinated
+                          </Badge>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Small Score Ring in Corner */}
+                    <ScoreRing score={outfit.score} size={50} strokeWidth={4} />
+                  </div>
+
+                  {/* Item Photos & Names */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
+                      {outfit.items.map((item) => {
+                        const emoji = CATEGORY_EMOJI[item.category] || '👕';
+                        const colorInfo = getColorInfo(item.color);
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="w-28 sm:w-32 shrink-0 rounded-2xl overflow-hidden bg-white/60 border border-white/90 shadow-xs flex flex-col group/item transition-transform hover:-translate-y-0.5"
+                          >
+                            {/* Photo with 4:5 aspect ratio */}
+                            <div className="aspect-[4/5] bg-white/40 relative overflow-hidden flex items-center justify-center">
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  loading="lazy"
+                                  className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
+                                />
+                              ) : (
+                                <span className="text-3xl select-none">{emoji}</span>
+                              )}
+                              <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-white/80 backdrop-blur-md text-[#1E2140] border border-white/80">
+                                {item.category}
+                              </span>
+                            </div>
+
+                            {/* Details */}
+                            <div className="p-2 space-y-0.5 bg-white/80 min-w-0">
+                              <Link
+                                to={`/wardrobe/${item.id}/edit`}
+                                className="text-xs font-bold font-heading text-[#1E2140] hover:text-[#4F5BD5] transition-colors truncate block"
+                                title={item.name}
+                              >
+                                {item.name}
+                              </Link>
+                              <div className="flex items-center space-x-1 text-[10px] text-[#6B7194]">
+                                <span
+                                  className="w-2 h-2 rounded-full border border-black/10 shrink-0"
+                                  style={{ backgroundColor: colorInfo.hex }}
+                                />
+                                <span className="capitalize truncate">{item.color}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Harmony Score Pill */}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-slate-400">Match score:</span>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                      {matchScorePct}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Items Row Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                  {outfit.items.map((item) => {
-                    const emoji = CATEGORY_EMOJI[item.category] || '👕';
-                    const dotColor = getColorDot(item.color);
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="bg-slate-800/60 border border-slate-700/60 rounded-xl overflow-hidden flex flex-col group/item hover:border-indigo-500/40 transition"
-                      >
-                        {/* Image Thumbnail */}
-                        <div className="aspect-[4/5] bg-slate-800 relative overflow-hidden flex items-center justify-center">
-                          {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.name}
-                              loading="lazy"
-                              className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <span className="text-3xl sm:text-4xl">{emoji}</span>
-                          )}
-                          {/* Category Tag Overlay */}
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-slate-950/80 backdrop-blur-sm text-slate-200 border border-slate-700/60">
-                            {item.category}
-                          </span>
-                        </div>
-
-                        {/* Item Details */}
-                        <div className="p-3 space-y-1 min-w-0">
-                          <Link
-                            to={`/wardrobe/${item.id}/edit`}
-                            className="text-xs sm:text-sm font-semibold text-slate-200 hover:text-indigo-300 transition truncate block"
-                          >
-                            {item.name}
-                          </Link>
-                          <div className="flex items-center space-x-1.5 text-[11px] text-slate-400">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: dotColor }}
-                            />
-                            <span className="capitalize truncate">{item.color}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Reasons Chips Strip */}
-                {outfit.reasons && outfit.reasons.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <span className="text-xs text-slate-400 font-medium">Why it works:</span>
-                    {outfit.reasons.map((reason, rIdx) => (
-                      <span
-                        key={rIdx}
-                        className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-950/60 text-indigo-300 border border-indigo-500/30"
-                      >
-                        <span className="mr-1 text-[10px]">✓</span> {reason}
+                  {/* Reason Chips as Pastel Pills */}
+                  {outfit.reasons && outfit.reasons.length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-[#6B7194] uppercase tracking-wider font-heading block">
+                        Why this works:
                       </span>
-                    ))}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {outfit.reasons.map((reason, rIdx) => {
+                          const variant = REASON_VARIANTS[rIdx % REASON_VARIANTS.length];
+                          return (
+                            <Badge
+                              key={rIdx}
+                              variant={variant}
+                              size="sm"
+                              dot
+                            >
+                              {reason}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Three Actions: Wore this today, Save as outfit, Try another */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 pt-3 border-t border-[#E3E6FB]/80">
+                    {/* Action 1: Wore this today */}
+                    <Button
+                      variant={outfitState.worn ? 'secondary' : 'primary'}
+                      size="md"
+                      onClick={() => handleWoreToday(index)}
+                      disabled={outfitState.wearing || outfitState.worn}
+                      loading={outfitState.wearing}
+                      className="gap-1.5 text-xs sm:text-sm"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{outfitState.worn ? 'Worn Today' : 'Wore this today'}</span>
+                    </Button>
+
+                    {/* Action 2: Save as outfit */}
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={() => handleSaveOutfit(index)}
+                      disabled={outfitState.saving || outfitState.saved}
+                      loading={outfitState.saving}
+                      className="gap-1.5 text-xs sm:text-sm"
+                    >
+                      <Bookmark className="w-4 h-4 text-[#4F5BD5]" />
+                      <span>{outfitState.saved ? 'Saved' : 'Save as outfit'}</span>
+                    </Button>
+
+                    {/* Action 3: Try another */}
+                    <Button
+                      variant="ghost"
+                      size="md"
+                      onClick={() => handleTryAnother(index)}
+                      className="gap-1.5 text-xs sm:text-sm text-[#6B7194] hover:text-[#1E2140]"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Try another</span>
+                    </Button>
                   </div>
-                )}
-
-                {/* Card Action Buttons */}
-                <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-slate-800/80">
-                  {/* Action 1: Wore this today */}
-                  <button
-                    onClick={() => handleWoreToday(index)}
-                    disabled={outfitState.wearing || outfitState.worn}
-                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition inline-flex items-center space-x-1.5 cursor-pointer ${
-                      outfitState.worn
-                        ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 cursor-default'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                    }`}
-                  >
-                    <span>{outfitState.worn ? '✓' : '👟'}</span>
-                    <span>{outfitState.worn ? 'Worn today' : outfitState.wearing ? 'Logging...' : 'Wore this today'}</span>
-                  </button>
-
-                  {/* Action 2: Save as outfit */}
-                  <button
-                    onClick={() => handleSaveOutfit(index)}
-                    disabled={outfitState.saving || outfitState.saved}
-                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition inline-flex items-center space-x-1.5 cursor-pointer ${
-                      outfitState.saved
-                        ? 'bg-purple-600/20 text-purple-300 border border-purple-500/40 cursor-default'
-                        : 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                    }`}
-                  >
-                    <span>{outfitState.saved ? '✓' : '💾'}</span>
-                    <span>{outfitState.saved ? 'Saved' : outfitState.saving ? 'Saving...' : 'Save as outfit'}</span>
-                  </button>
-
-                  {/* Action 3: Try another */}
-                  <button
-                    onClick={() => handleTryAnother(index)}
-                    className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700 transition inline-flex items-center space-x-1.5 cursor-pointer"
-                  >
-                    <span>🔄</span>
-                    <span>Try another</span>
-                  </button>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
   );
 }
-

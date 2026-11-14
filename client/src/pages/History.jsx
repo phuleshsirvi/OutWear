@@ -1,25 +1,34 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { Search, X, RotateCcw, AlertCircle } from 'lucide-react';
 import { getWearHistory, deleteWearLog } from '../api/wear.js';
+import { Button, StatusPill, Modal, Toast, EmptyState, Skeleton } from '../components/ui/index.js';
 
-function formatWearDate(dateStr) {
+function formatMonthHeader(dateStr) {
+  if (!dateStr) return 'UNKNOWN DATE';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 'UNKNOWN DATE';
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+}
+
+function formatLogDate(dateStr) {
   if (!dateStr) return '';
-  const str = String(dateStr).slice(0, 10);
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
-
-  if (str === todayStr) return 'Today';
-  if (str === yesterdayStr) return 'Yesterday';
-
-  const [year, month, day] = str.split('-').map(Number);
-  const d = new Date(year, month - 1, day);
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString(undefined, {
-    year: 'numeric',
+    weekday: 'short',
     month: 'short',
     day: 'numeric',
+  });
+}
+
+function formatLogTime(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
@@ -37,6 +46,7 @@ export default function History() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Undo confirmation modal state
   const [logToUndo, setLogToUndo] = useState(null);
@@ -69,7 +79,7 @@ export default function History() {
     try {
       await deleteWearLog(logToUndo.id);
       setLogs((prev) => prev.filter((l) => l.id !== logToUndo.id));
-      setToastMessage(`✓ Wear log for "${logToUndo.name}" undone successfully.`);
+      setToastMessage(`Wear log for "${logToUndo.name}" undone successfully.`);
       setLogToUndo(null);
 
       setTimeout(() => {
@@ -82,293 +92,346 @@ export default function History() {
     }
   };
 
+  // Filter logs by search query (name, category, occasion, items)
+  const filteredLogs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return logs;
+
+    return logs.filter((log) => {
+      const nameMatch = log.name?.toLowerCase().includes(q);
+      const categoryMatch = log.category?.toLowerCase().includes(q);
+      const occasionMatch = log.occasion?.toLowerCase().includes(q);
+      const itemsMatch = log.items?.some((i) => i.name?.toLowerCase().includes(q));
+      return Boolean(nameMatch || categoryMatch || occasionMatch || itemsMatch);
+    });
+  }, [logs, searchQuery]);
+
+  // Group logs by month: "OCTOBER 2026", "SEPTEMBER 2026"
+  const monthGroups = useMemo(() => {
+    const groups = [];
+    const groupMap = new Map();
+
+    filteredLogs.forEach((log) => {
+      const rawDate = log.date || log.wornAt;
+      const d = new Date(rawDate);
+      const monthKey = !isNaN(d.getTime())
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        : 'unknown';
+
+      if (!groupMap.has(monthKey)) {
+        const group = {
+          monthKey,
+          label: formatMonthHeader(rawDate),
+          items: [],
+        };
+        groupMap.set(monthKey, group);
+        groups.push(group);
+      }
+      groupMap.get(monthKey).items.push(log);
+    });
+
+    return groups;
+  }, [filteredLogs]);
+
   return (
-    <div className="w-full max-w-4xl mx-auto py-4 sm:py-6 space-y-6">
-      {/* Success Toast */}
+    <div className="w-full max-w-4xl mx-auto py-2 sm:py-6 space-y-6 font-sans animate-fade-in-up">
+      {/* Toast Notification */}
       {toastMessage && (
-        <div
-          role="status"
-          className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3.5 text-sm text-emerald-400 flex items-center justify-between"
-        >
-          <div className="flex items-center space-x-2">
-            <span>✓</span>
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            onClick={() => setToastMessage('')}
-            className="text-emerald-400 hover:text-emerald-300 text-xs ml-4 cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
+        <Toast
+          message={toastMessage}
+          type="success"
+          onDismiss={() => setToastMessage('')}
+        />
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <div className="flex items-center space-x-3">
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-[#1E2140] tracking-tight">
               Wear History
             </h1>
             {!loading && !error && (
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-mono font-medium">
+              <StatusPill variant="primary" size="md" className="font-semibold shadow-xs">
                 {logs.length} {logs.length === 1 ? 'record' : 'records'}
-              </span>
+              </StatusPill>
             )}
           </div>
-          <p className="text-slate-400 text-xs sm:text-sm mt-1">
+          <p className="text-xs sm:text-sm text-[#6B7194] mt-1 font-sans">
             Timeline of worn items and outfits. Track wearing habits and undo accidental logs.
           </p>
         </div>
 
         <div className="flex items-center space-x-2">
-          <Link
-            to="/wardrobe"
-            className="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-300 text-xs font-medium transition"
-          >
+          <Button as={Link} to="/wardrobe" variant="secondary" size="sm">
             Wardrobe
-          </Link>
-          <Link
-            to="/outfits"
-            className="py-2 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition"
-          >
+          </Button>
+          <Button as={Link} to="/outfits" variant="primary" size="sm">
             Outfits
-          </Link>
+          </Button>
         </div>
       </div>
 
-      {/* Content Area */}
+      {/* Content Area: Table-style list inside glass card */}
       {loading ? (
         /* Loading Skeleton */
-        <div className="space-y-3">
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-4 animate-pulse flex items-center justify-between gap-4"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-14 h-14 rounded-xl bg-slate-700/60 shrink-0" />
-                <div className="space-y-2">
-                  <div className="h-4 bg-slate-700/60 rounded w-40" />
-                  <div className="h-3 bg-slate-700/40 rounded w-24" />
+        <div className="rounded-3xl bg-white/75 border border-white/70 p-6 backdrop-blur-xl shadow-[0_10px_35px_rgba(99,102,241,0.08)] space-y-4">
+          <Skeleton className="h-10 w-full rounded-2xl" />
+          <div className="space-y-3 pt-2">
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="rounded-2xl bg-white/60 border border-white/80 p-3.5 flex items-center justify-between gap-4"
+              >
+                <div className="flex items-center space-x-3.5">
+                  <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-40 rounded-md" />
+                    <Skeleton className="h-3 w-24 rounded-md" />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="h-8 w-16 rounded-xl" />
                 </div>
               </div>
-              <div className="h-8 bg-slate-700/40 rounded-xl w-20" />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : error ? (
         /* Error State */
-        <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-red-500/5 border border-red-500/20 rounded-2xl space-y-4">
-          <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-2xl">
-            ⚠️
+        <div className="rounded-3xl bg-white/70 border border-rose-200 p-8 sm:p-12 text-center backdrop-blur-xl shadow-[0_10px_40px_rgba(99,102,241,0.08)] space-y-4 animate-fade-in-up">
+          <div className="w-14 h-14 rounded-full bg-[#FBE3DC] text-[#C2492E] flex items-center justify-center mx-auto shadow-xs">
+            <AlertCircle className="w-7 h-7" />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-slate-100">Unable to load wear history</h3>
-            <p className="text-slate-400 text-sm max-w-sm">{error}</p>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="text-lg font-bold font-heading text-[#1E2140]">Unable to load wear history</h3>
+            <p className="text-xs sm:text-sm text-[#6B7194]">{error}</p>
           </div>
-          <button
-            onClick={fetchHistory}
-            className="py-2.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-sm transition cursor-pointer"
-          >
+          <Button variant="secondary" onClick={fetchHistory}>
             Try again
-          </button>
+          </Button>
         </div>
       ) : logs.length === 0 ? (
         /* Empty State */
-        <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-slate-800/30 border border-dashed border-slate-700/80 rounded-2xl space-y-4">
-          <div className="w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-3xl">
-            📅
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-slate-100">No wear logs recorded yet</h3>
-            <p className="text-slate-400 text-sm max-w-sm">
-              Use the "Wore today" button on your wardrobe items or outfits to track your style routine.
-            </p>
-          </div>
-          <div className="flex items-center space-x-3 pt-2">
-            <Link
-              to="/wardrobe"
-              className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/20"
-            >
-              Go to Wardrobe
-            </Link>
-            <Link
-              to="/outfits"
-              className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium text-sm transition"
-            >
-              Go to Outfits
-            </Link>
-          </div>
-        </div>
+        <EmptyState
+          icon="📅"
+          title="No wear logs recorded yet"
+          description="Use the 'Wore today' button on your wardrobe items or outfits to track your style routine."
+          actionText="Go to Wardrobe"
+          actionLink="/wardrobe"
+          actionAs={Link}
+          className="animate-fade-in-up"
+        />
       ) : (
-        /* Logs List */
-        <div className="space-y-3">
-          {logs.map((log) => {
-            const isOutfit = log.type === 'outfit';
-            const emoji = isOutfit
-              ? '👔'
-              : CATEGORY_EMOJI[log.category?.toLowerCase()] || '👗';
-
-            return (
-              <div
-                key={log.id}
-                className="rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-slate-600/80 p-3.5 sm:p-4 shadow-md transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+        /* Table-Style List in Glass Card */
+        <div className="rounded-3xl bg-white/75 border border-white/70 backdrop-blur-xl p-4 sm:p-6 shadow-[0_10px_35px_rgba(99,102,241,0.08)] space-y-6">
+          {/* Search Field */}
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6B7194]">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search history by item or outfit name, category, or occasion..."
+              className="w-full min-h-[44px] pl-10 pr-10 py-2.5 rounded-2xl bg-white/80 hover:bg-white focus:bg-white border border-white/80 text-[#1E2140] placeholder-[#6B7194] focus:outline-none focus:ring-2 focus:ring-[#4F5BD5]/25 focus:border-[#4F5BD5] text-xs sm:text-sm shadow-xs transition-all duration-200"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-3.5 min-w-[44px] flex items-center justify-center text-[#6B7194] hover:text-[#1E2140] transition-colors cursor-pointer"
+                aria-label="Clear search"
               >
-                {/* Photo & Log Info */}
-                <div className="flex items-center space-x-3.5 min-w-0">
-                  {/* Thumbnail */}
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-slate-900 border border-slate-700/80 shrink-0 flex items-center justify-center">
-                    {log.photo || log.imageUrl ? (
-                      <img
-                        src={log.photo || log.imageUrl}
-                        alt={log.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl select-none">{emoji}</span>
-                    )}
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {filteredLogs.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#E3E6FB] bg-white/40 p-8 text-center space-y-2">
+              <span className="text-2xl">🔍</span>
+              <p className="text-sm font-semibold font-heading text-[#1E2140]">
+                No records match "{searchQuery}"
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchQuery('')}
+              >
+                Clear search
+              </Button>
+            </div>
+          ) : (
+            /* Groups under Month Labels like "OCTOBER 2026" */
+            <div className="space-y-6">
+              {monthGroups.map((group) => (
+                <div key={group.monthKey} className="space-y-3">
+                  {/* Month Label in Small Caps */}
+                  <div className="flex items-center justify-between pb-1.5 border-b border-[#E3E6FB]/80">
+                    <span className="text-xs font-bold uppercase tracking-widest text-[#4F5BD5] font-heading">
+                      {group.label}
+                    </span>
+                    <span className="text-[11px] text-[#6B7194] font-medium">
+                      {group.items.length} {group.items.length === 1 ? 'wear' : 'wears'}
+                    </span>
                   </div>
 
-                  {/* Text Details */}
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${
-                          isOutfit
-                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                            : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-                        }`}
-                      >
-                        {isOutfit ? 'Outfit' : 'Item'}
-                      </span>
-                      {log.occasion && (
-                        <span className="text-[11px] text-slate-400 capitalize">
-                          · {log.occasion}
-                        </span>
-                      )}
-                      {log.category && (
-                        <span className="text-[11px] text-slate-400 capitalize">
-                          · {log.category}
-                        </span>
-                      )}
-                    </div>
+                  {/* Table-Style List Rows */}
+                  <div className="space-y-2.5">
+                    {group.items.map((log) => {
+                      const isOutfit = log.type === 'outfit';
+                      const emoji = isOutfit
+                        ? '👔'
+                        : CATEGORY_EMOJI[log.category?.toLowerCase()] || '👗';
 
-                    <h3
-                      className="text-sm sm:text-base font-semibold text-slate-100 truncate"
-                      title={log.name}
-                    >
-                      {log.name}
-                    </h3>
+                      const rawDate = log.date || log.wornAt;
 
-                    {isOutfit && log.items?.length > 0 && (
-                      <p className="text-xs text-slate-400 truncate">
-                        {log.items.map((i) => i.name).join(' · ')}
-                      </p>
-                    )}
+                      return (
+                        <div
+                          key={log.id}
+                          className="rounded-2xl bg-white/70 hover:bg-white border border-white/80 p-3 sm:p-4 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                        >
+                          {/* Photo & Name */}
+                          <div className="flex items-center space-x-3.5 min-w-0 flex-1">
+                            {/* Thumbnail */}
+                            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-white/60 border border-white/90 shrink-0 flex items-center justify-center shadow-xs">
+                              {log.photo || log.imageUrl ? (
+                                <img
+                                  src={log.photo || log.imageUrl}
+                                  alt={log.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                              ) : (
+                                <span className="text-2xl select-none">{emoji}</span>
+                              )}
+                            </div>
+
+                            {/* Name & Subtitle */}
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                              <h3
+                                className="text-sm sm:text-base font-bold font-heading text-[#1E2140] truncate"
+                                title={log.name}
+                              >
+                                {log.name}
+                              </h3>
+
+                              <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#6B7194]">
+                                {log.category && (
+                                  <span className="capitalize">{log.category}</span>
+                                )}
+                                {log.occasion && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="capitalize">{log.occasion}</span>
+                                  </>
+                                )}
+                                {isOutfit && log.items?.length > 0 && (
+                                  <span className="text-[11px] text-[#6B7194] truncate max-w-xs">
+                                    • {log.items.map((i) => i.name).join(', ')}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Date, Type StatusPill & Ghost Undo Button */}
+                          <div className="flex items-center justify-between sm:justify-end space-x-3 sm:space-x-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E3E6FB]/70 shrink-0">
+                            {/* Date */}
+                            <div className="text-left sm:text-right">
+                              <div className="text-xs font-semibold text-[#1E2140]">
+                                {formatLogDate(rawDate)}
+                              </div>
+                              <div className="text-[11px] text-[#6B7194] font-mono">
+                                {formatLogTime(rawDate)}
+                              </div>
+                            </div>
+
+                            {/* StatusPill for "Item" or "Outfit" */}
+                            <StatusPill
+                              variant={isOutfit ? 'lavender' : 'blue'}
+                              size="sm"
+                              dot
+                              className="font-semibold shadow-2xs"
+                            >
+                              {isOutfit ? 'Outfit' : 'Item'}
+                            </StatusPill>
+
+                            {/* Ghost Undo Button */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setUndoError('');
+                                setLogToUndo(log);
+                              }}
+                              title="Undo this wear record"
+                              aria-label={`Undo wear log for ${log.name}`}
+                              className="text-[#6B7194] hover:text-[#C2492E] hover:bg-rose-50 gap-1.5 px-2.5"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Undo</span>
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-
-                {/* Date & Undo Action */}
-                <div className="flex items-center justify-between sm:justify-end space-x-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-700/50">
-                  <div className="text-left sm:text-right">
-                    <div className="text-xs sm:text-sm font-semibold text-slate-200">
-                      {formatWearDate(log.date || log.wornAt)}
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-mono">
-                      {new Date(log.date || log.wornAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUndoError('');
-                      setLogToUndo(log);
-                    }}
-                    title="Undo this wear record"
-                    className="py-1.5 px-3 rounded-xl bg-red-600/10 hover:bg-red-600/20 text-red-400 hover:text-red-300 border border-red-500/30 text-xs font-medium transition cursor-pointer flex items-center space-x-1.5"
-                  >
-                    <span>↺</span>
-                    <span>Undo</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Undo Confirmation Modal */}
-      {logToUndo && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          onClick={() => !isUndoing && setLogToUndo(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 mx-auto rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-xl">
-              ↺
-            </div>
+      <Modal
+        isOpen={Boolean(logToUndo)}
+        onClose={() => !isUndoing && setLogToUndo(null)}
+        title="Undo Wear Log?"
+        description={`Remove the wear log for "${logToUndo?.name}" on ${formatLogDate(
+          logToUndo?.date || logToUndo?.wornAt
+        )}?`}
+      >
+        <div className="space-y-4 pt-1 font-sans">
+          <p className="text-xs text-[#6B7194]">
+            This will decrement wear counts and recalculate last-worn dates for this item or outfit.
+          </p>
 
-            <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-slate-100">
-                Undo Wear Log?
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-400">
-                Are you sure you want to remove the wear log for{' '}
-                <span className="font-semibold text-slate-200">
-                  "{logToUndo.name}"
-                </span>{' '}
-                on {formatWearDate(logToUndo.date || logToUndo.wornAt)}? This will decrement wear counts and recalculate last-worn dates.
-              </p>
+          {undoError && (
+            <div
+              role="alert"
+              className="text-xs text-[#C2492E] bg-[#FBE3DC] border border-rose-300 rounded-xl p-3"
+            >
+              ⚠️ {undoError}
             </div>
+          )}
 
-            {undoError && (
-              <div
-                role="alert"
-                className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl p-2.5 text-left"
-              >
-                {undoError}
-              </div>
-            )}
-
-            <div className="flex items-center space-x-3 pt-2">
-              <button
-                type="button"
-                disabled={isUndoing}
-                onClick={() => setLogToUndo(null)}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs sm:text-sm transition border border-slate-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isUndoing}
-                onClick={handleConfirmUndo}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-medium text-xs sm:text-sm transition shadow-lg shadow-red-600/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center space-x-1.5"
-              >
-                {isUndoing ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Undoing...</span>
-                  </>
-                ) : (
-                  <span>Undo Wear</span>
-                )}
-              </button>
-            </div>
+          <div className="flex items-center justify-end space-x-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              disabled={isUndoing}
+              onClick={() => setLogToUndo(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="md"
+              loading={isUndoing}
+              onClick={handleConfirmUndo}
+            >
+              Undo Wear
+            </Button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
-

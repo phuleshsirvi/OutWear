@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import { Plus, Check, X, AlertCircle } from 'lucide-react';
 import { getOutfits } from '../api/outfits.js';
 import OutfitCard from '../components/OutfitCard.jsx';
+import { Button, Badge, EmptyState, Skeleton } from '../components/ui/index.js';
 
 export default function Outfits() {
   const location = useLocation();
@@ -32,114 +34,109 @@ export default function Outfits() {
   }, []);
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-6 animate-fade-in-up font-sans">
       {/* Success banner if navigated with flash message */}
       {bannerMessage && (
         <div
           role="status"
-          className="w-full rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3.5 text-sm text-emerald-400 flex items-center justify-between"
+          className="w-full rounded-2xl bg-[#E3F2D9]/90 border border-[#A8D5A2] p-4 text-xs sm:text-sm text-[#4C8A3A] flex items-center justify-between shadow-xs backdrop-blur-xl animate-fade-in-up"
         >
-          <div className="flex items-center space-x-2">
-            <span>✓</span>
-            <span>{bannerMessage}</span>
+          <div className="flex items-center space-x-2.5">
+            <Check className="w-4 h-4 text-[#4C8A3A]" />
+            <span className="font-medium">{bannerMessage}</span>
           </div>
           <button
             onClick={() => setBannerMessage('')}
-            className="text-emerald-400 hover:text-emerald-300 text-xs ml-4 cursor-pointer"
+            className="text-[#4C8A3A] hover:text-[#1E2140] text-xs ml-4 cursor-pointer p-1 rounded-lg hover:bg-white/40 transition-colors"
+            aria-label="Dismiss banner"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <div className="flex items-center space-x-3">
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-[#1E2140] tracking-tight">
               My Outfits
             </h1>
             {!loading && !error && (
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-mono font-medium">
+              <Badge variant="primary" size="md" className="font-semibold shadow-xs">
                 {outfits.length} {outfits.length === 1 ? 'outfit' : 'outfits'}
-              </span>
+              </Badge>
             )}
           </div>
-          <p className="text-slate-400 text-xs sm:text-sm mt-1">
+          <p className="text-xs sm:text-sm text-[#6B7194] mt-1 font-sans">
             Curate, organize, and style your wardrobe pieces into complete looks
           </p>
         </div>
 
-        <Link
+        <Button
+          as={Link}
           to="/outfits/new"
-          className="inline-flex items-center justify-center py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/20 cursor-pointer space-x-2 shrink-0"
+          variant="primary"
+          size="md"
+          className="gap-2 shadow-[0_4px_16px_rgba(79,91,213,0.25)] shrink-0 self-start sm:self-auto"
         >
-          <span className="text-base font-bold leading-none">+</span>
-          <span>New outfit</span>
-        </Link>
+          <Plus className="w-4 h-4" />
+          <span>New Outfit</span>
+        </Button>
       </div>
 
       {/* Content Area */}
       {loading ? (
-        /* Loading Skeleton */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {Array.from({ length: 6 }).map((_, idx) => (
+        /* Loading Skeletons */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 animate-fade-in-up">
+          {Array.from({ length: 8 }).map((_, idx) => (
             <div
               key={idx}
-              className="rounded-2xl bg-slate-800/60 border border-slate-700/60 overflow-hidden animate-pulse flex flex-col"
+              className="rounded-3xl bg-white/70 border border-white/60 p-3.5 space-y-3.5 backdrop-blur-xl shadow-[0_10px_30px_rgba(99,102,241,0.06)]"
             >
-              <div className="aspect-square w-full bg-slate-700/50 p-2">
-                <div className="grid grid-cols-2 grid-rows-2 gap-1.5 w-full h-full">
-                  <div className="bg-slate-700/60 rounded-xl" />
-                  <div className="bg-slate-700/60 rounded-xl" />
-                  <div className="bg-slate-700/60 rounded-xl" />
-                  <div className="bg-slate-700/60 rounded-xl" />
+              <div className="aspect-square w-full rounded-2xl bg-white/50 p-2">
+                <div className="grid grid-cols-2 grid-rows-2 gap-2 w-full h-full">
+                  <Skeleton className="rounded-xl w-full h-full" />
+                  <Skeleton className="rounded-xl w-full h-full" />
+                  <Skeleton className="rounded-xl w-full h-full" />
+                  <Skeleton className="rounded-xl w-full h-full" />
                 </div>
               </div>
-              <div className="p-4 space-y-2.5">
-                <div className="h-4 bg-slate-700/60 rounded w-2/3" />
-                <div className="h-3 bg-slate-700/40 rounded w-1/3" />
+              <div className="p-1 space-y-2">
+                <Skeleton className="h-4 w-3/4 rounded-md" />
+                <Skeleton className="h-3 w-1/3 rounded-md" />
+                <div className="pt-2">
+                  <Skeleton className="h-10 w-full rounded-2xl" />
+                </div>
               </div>
             </div>
           ))}
         </div>
       ) : error ? (
         /* Error State */
-        <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-red-500/5 border border-red-500/20 rounded-2xl space-y-4">
-          <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-2xl">
-            ⚠️
+        <div className="rounded-3xl bg-white/70 border border-rose-200 p-8 sm:p-12 text-center backdrop-blur-xl shadow-[0_10px_40px_rgba(99,102,241,0.08)] space-y-4 animate-fade-in-up">
+          <div className="w-14 h-14 rounded-full bg-[#FBE3DC] text-[#C2492E] flex items-center justify-center mx-auto shadow-xs">
+            <AlertCircle className="w-7 h-7" />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-slate-100">Unable to load outfits</h3>
-            <p className="text-slate-400 text-sm max-w-sm">{error}</p>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="text-lg font-bold font-heading text-[#1E2140]">Unable to load outfits</h3>
+            <p className="text-xs sm:text-sm text-[#6B7194]">{error}</p>
           </div>
-          <button
-            onClick={fetchUserOutfits}
-            className="py-2.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-sm transition cursor-pointer"
-          >
+          <Button variant="secondary" onClick={fetchUserOutfits}>
             Try again
-          </button>
+          </Button>
         </div>
       ) : outfits.length === 0 ? (
         /* Empty State */
-        <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-slate-800/30 border border-dashed border-slate-700/80 rounded-2xl space-y-4">
-          <div className="w-16 h-16 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-3xl">
-            👔
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-slate-100">No outfits created yet</h3>
-            <p className="text-slate-400 text-sm max-w-sm">
-              Combine your tops, bottoms, shoes, and accessories into personalized outfits for any occasion.
-            </p>
-          </div>
-          <Link
-            to="/outfits/new"
-            className="py-2.5 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/20 cursor-pointer inline-flex items-center space-x-2"
-          >
-            <span>+</span>
-            <span>Create your first outfit</span>
-          </Link>
-        </div>
+        <EmptyState
+          icon="👗"
+          title="No outfits created yet"
+          description="Combine your tops, bottoms, shoes, and accessories into personalized outfits for any occasion."
+          actionText="Create your first outfit"
+          actionLink="/outfits/new"
+          actionAs={Link}
+          className="animate-fade-in-up"
+        />
       ) : (
         /* Outfits Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">

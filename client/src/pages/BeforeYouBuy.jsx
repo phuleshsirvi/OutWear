@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { Search, ArrowLeft, CheckCircle2, AlertCircle, AlertOctagon } from 'lucide-react';
 import { CATEGORIES, OCCASIONS, SEASONS } from '../constants/wardrobe.js';
 import { getFilterOptions } from '../api/items.js';
 import { checkDuplicate } from '../api/duplicates.js';
+import { getColorInfo } from '../constants/colors.js';
+import { Button, StatusPill, Input, Select, Skeleton } from '../components/ui/index.js';
 
 // Fallback category emojis
 const CATEGORY_EMOJI = {
@@ -14,42 +17,6 @@ const CATEGORY_EMOJI = {
   shoes: '👟',
   accessory: '👜',
 };
-
-// Common color to hex mapping for small dot indicators
-const COLOR_HEX_MAP = {
-  black: '#0f172a',
-  white: '#f8fafc',
-  red: '#ef4444',
-  blue: '#3b82f6',
-  green: '#22c55e',
-  yellow: '#eab308',
-  pink: '#ec4899',
-  purple: '#a855f7',
-  orange: '#f97316',
-  brown: '#78350f',
-  grey: '#6b7280',
-  gray: '#6b7280',
-  beige: '#e2d5c3',
-  navy: '#1e3a8a',
-  maroon: '#800000',
-  cream: '#fffdd0',
-  olive: '#556b2f',
-  teal: '#0d9488',
-  lavender: '#e6e6fa',
-  tan: '#d2b48c',
-  khaki: '#c3b091',
-  coral: '#ff7f50',
-  gold: '#ffd700',
-  silver: '#c0c0c0',
-  charcoal: '#333333',
-  burgundy: '#800020',
-};
-
-function getColorDot(colorStr) {
-  if (!colorStr) return '#94a3b8';
-  const norm = colorStr.toLowerCase().trim();
-  return COLOR_HEX_MAP[norm] || '#94a3b8';
-}
 
 function capitalize(str) {
   if (!str) return '';
@@ -155,7 +122,6 @@ export default function BeforeYouBuy() {
     e?.preventDefault();
     if (!color.trim()) return;
 
-    // Update query string
     const newParams = {
       category,
       color: color.trim().toLowerCase(),
@@ -168,94 +134,91 @@ export default function BeforeYouBuy() {
     runCheck(category, color.trim(), occasion, season, fabric.trim());
   };
 
+  const activeColorInfo = color.trim() ? getColorInfo(color) : null;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 font-sans animate-fade-in-up">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-300 via-teal-100 to-indigo-300 bg-clip-text text-transparent flex items-center gap-2.5">
-            <span>🛍️</span> Before You Buy
+          <h1 className="text-2xl sm:text-3xl font-extrabold font-heading tracking-tight text-[#1E2140] flex items-center gap-2.5">
+            <span>🛍️</span>
+            <span>Before You Buy</span>
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Check your wardrobe before buying to avoid accidental duplicates and wasted purchases
+          <p className="text-xs sm:text-sm text-[#6B7194] mt-1 font-sans">
+            Check your closet before buying to prevent duplicate purchases and buyer's remorse
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Link
-            to="/wardrobe"
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition"
-          >
-            Wardrobe Grid
-          </Link>
-          <Link
-            to="/underused"
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition"
-          >
+        <div className="flex items-center space-x-2">
+          <Button as={Link} to="/wardrobe" variant="secondary" size="sm" className="gap-1.5">
+            <ArrowLeft className="w-4 h-4" />
+            <span>Wardrobe</span>
+          </Button>
+          <Button as={Link} to="/underused" variant="ghost" size="sm">
             Underused Items
-          </Link>
+          </Button>
         </div>
       </div>
 
-      {/* Check Form */}
+      {/* FORM CARD */}
       <form
         onSubmit={handleSubmit}
-        className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4"
+        className="bg-white/75 border border-white/70 rounded-3xl p-5 sm:p-6 shadow-[0_10px_35px_rgba(99,102,241,0.08)] space-y-4 backdrop-blur-xl"
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-          {/* Category Select (Required) */}
-          <div className="space-y-1.5">
-            <label htmlFor="buy-category" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Category <span className="text-indigo-400">*</span>
-            </label>
-            <select
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Category Select */}
+          <div>
+            <Select
               id="buy-category"
+              label="Category"
+              required
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/80 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition capitalize"
-              required
+              aria-label="Category"
             >
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
                   {CATEGORY_EMOJI[cat] || '👕'} {capitalize(cat)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
-          {/* Color Input with Datalist (Required) */}
-          <div className="space-y-1.5">
-            <label htmlFor="buy-color" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Color <span className="text-indigo-400">*</span>
-            </label>
-            <div className="relative">
-              <input
-                id="buy-color"
-                type="text"
-                list="owned-colors"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                placeholder="e.g. Black, Navy, Maroon"
-                className="w-full bg-slate-800 border border-slate-700/80 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                required
-              />
-              <datalist id="owned-colors">
-                {ownedColors.map((c) => (
-                  <option key={c} value={capitalize(c)} />
-                ))}
-              </datalist>
-            </div>
+          {/* Color Input with Datalist */}
+          <div className="relative">
+            <Input
+              id="buy-color"
+              label="Color"
+              required
+              list="owned-colors"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              placeholder="e.g. Black, Navy, Maroon"
+              aria-label="Color"
+              suffixIcon={
+                activeColorInfo ? (
+                  <span
+                    className="w-3.5 h-3.5 rounded-full border border-black/15 shadow-xs"
+                    style={{ backgroundColor: activeColorInfo.hex }}
+                  />
+                ) : null
+              }
+            />
+            <datalist id="owned-colors">
+              {ownedColors.map((c) => (
+                <option key={c} value={capitalize(c)} />
+              ))}
+            </datalist>
           </div>
 
           {/* Occasion (Optional) */}
-          <div className="space-y-1.5">
-            <label htmlFor="buy-occasion" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Occasion
-            </label>
-            <select
+          <div>
+            <Select
               id="buy-occasion"
+              label="Occasion"
               value={occasion}
               onChange={(e) => setOccasion(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/80 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              aria-label="Occasion"
             >
               <option value="">Any Occasion</option>
               {OCCASIONS.map((occ) => (
@@ -263,19 +226,17 @@ export default function BeforeYouBuy() {
                   {capitalize(occ)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Season (Optional) */}
-          <div className="space-y-1.5">
-            <label htmlFor="buy-season" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Season
-            </label>
-            <select
+          <div>
+            <Select
               id="buy-season"
+              label="Season"
               value={season}
               onChange={(e) => setSeason(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700/80 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              aria-label="Season"
             >
               <option value="">Any Season</option>
               {SEASONS.map((sea) => (
@@ -283,49 +244,49 @@ export default function BeforeYouBuy() {
                   {capitalize(sea)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Fabric (Optional) */}
-          <div className="space-y-1.5">
-            <label htmlFor="buy-fabric" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Fabric
-            </label>
-            <input
+          <div>
+            <Input
               id="buy-fabric"
-              type="text"
+              label="Fabric"
               value={fabric}
               onChange={(e) => setFabric(e.target.value)}
-              placeholder="e.g. Cotton, Linen, Silk"
+              placeholder="e.g. Cotton, Linen, Wool"
               maxLength={40}
-              className="w-full bg-slate-800 border border-slate-700/80 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+              aria-label="Fabric"
             />
           </div>
         </div>
 
         {/* Submit Action */}
         <div className="flex justify-end pt-2">
-          <button
+          <Button
             type="submit"
+            variant="primary"
+            size="md"
             disabled={loading || !color.trim()}
-            className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/30 transition disabled:opacity-50 cursor-pointer"
+            loading={loading}
+            className="w-full sm:w-auto shadow-[0_4px_16px_rgba(79,91,213,0.25)] font-bold gap-2"
           >
-            <span>{loading ? '⏳' : '🔍'}</span>
-            <span>{loading ? 'Checking wardrobe...' : 'Check my wardrobe'}</span>
-          </button>
+            <Search className="w-4 h-4" />
+            <span>Check My Wardrobe</span>
+          </Button>
         </div>
       </form>
 
       {/* Initial Idle State (Before search) */}
       {!hasSearched && !loading && (
         <div className="max-w-2xl mx-auto py-12 text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center text-3xl">
+          <div className="w-16 h-16 mx-auto rounded-3xl bg-[#E3E6FB] text-[#4F5BD5] flex items-center justify-center text-3xl shadow-xs">
             🧐
           </div>
           <div className="space-y-1.5">
-            <h2 className="text-xl font-bold text-white">Smart Wardrobe Check</h2>
-            <p className="text-sm text-slate-400 max-w-md mx-auto">
-              Thinking about buying something new? Select the category and color above to instantly check your existing closet for duplicates or neglected twins.
+            <h2 className="text-xl font-bold font-heading text-[#1E2140]">Smart Wardrobe Check</h2>
+            <p className="text-sm text-[#6B7194] max-w-md mx-auto">
+              Thinking about buying something new? Select the category and color above to instantly check your existing closet for duplicates or neglected pieces.
             </p>
           </div>
         </div>
@@ -333,11 +294,11 @@ export default function BeforeYouBuy() {
 
       {/* Loading Skeleton */}
       {loading && (
-        <div className="space-y-6 animate-pulse">
-          <div className="h-28 bg-slate-800/60 rounded-2xl border border-slate-700/60 p-6" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="space-y-6">
+          <Skeleton className="h-32 rounded-3xl" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-64 bg-slate-800/40 rounded-2xl border border-slate-700/50" />
+              <Skeleton key={i} className="h-72 rounded-3xl" />
             ))}
           </div>
         </div>
@@ -345,125 +306,163 @@ export default function BeforeYouBuy() {
 
       {/* Error State */}
       {!loading && error && (
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
-          <div className="w-16 h-16 mx-auto rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl">
-            ⚠️
+        <div className="max-w-md mx-auto py-16 text-center space-y-4 font-sans animate-fade-in-up">
+          <div className="rounded-3xl bg-white/75 border border-white/70 backdrop-blur-xl p-8 shadow-[0_10px_40px_rgba(99,102,241,0.08)] space-y-4">
+            <div className="w-14 h-14 rounded-full bg-[#FBE3DC] text-[#C2492E] flex items-center justify-center mx-auto shadow-xs">
+              <AlertCircle className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold font-heading text-[#1E2140]">
+                Duplicate Check Failed
+              </h2>
+              <p className="text-xs sm:text-sm text-[#6B7194]">{error}</p>
+            </div>
+            <Button variant="primary" onClick={handleSubmit}>
+              Try again
+            </Button>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-xl sm:text-2xl font-bold text-white">
-              Duplicate Check Failed
-            </h2>
-            <p className="text-slate-400 text-sm max-w-md mx-auto">{error}</p>
-          </div>
-          <button
-            onClick={handleSubmit}
-            className="inline-flex items-center px-5 py-2.5 rounded-xl font-medium text-sm bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition cursor-pointer"
-          >
-            Try again
-          </button>
         </div>
       )}
 
       {/* Results Section */}
       {!loading && !error && result && (
         <div className="space-y-6">
-          {/* Verdict Banner */}
+          {/* VERDICT BANNER IN A SOFT TINTED CARD:
+              Green (go), Amber (think), Red (skip) with icon and clear text */}
           <div
-            className={`rounded-2xl p-6 sm:p-7 border shadow-xl flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5 ${
+            className={`rounded-3xl p-6 sm:p-7 border flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6 backdrop-blur-xl shadow-xs transition-all ${
               result.verdict.level === 'go'
-                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100 shadow-emerald-950/40'
+                ? 'bg-[#E3F2D9]/90 border-[#A8D5A2] text-[#4C8A3A]'
                 : result.verdict.level === 'think'
-                ? 'bg-amber-950/40 border-amber-500/40 text-amber-100 shadow-amber-950/40'
-                : 'bg-rose-950/40 border-rose-500/40 text-rose-100 shadow-rose-950/40'
+                ? 'bg-[#FCEBD0]/90 border-[#F5C98A] text-[#9A6410]'
+                : 'bg-[#FBE3DC]/90 border-rose-300 text-[#C2492E]'
             }`}
           >
-            {/* Verdict Icon Pill */}
+            {/* Verdict Icon Circle */}
             <div
-              className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 border ${
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-xs ${
                 result.verdict.level === 'go'
-                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                  ? 'bg-white text-[#4C8A3A]'
                   : result.verdict.level === 'think'
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                  : 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                  ? 'bg-white text-[#9A6410]'
+                  : 'bg-white text-[#C2492E]'
               }`}
             >
-              {result.verdict.level === 'go' ? '✅' : result.verdict.level === 'think' ? '🤔' : '🛑'}
+              {result.verdict.level === 'go' ? (
+                <CheckCircle2 className="w-8 h-8" />
+              ) : result.verdict.level === 'think' ? (
+                <AlertCircle className="w-8 h-8" />
+              ) : (
+                <AlertOctagon className="w-8 h-8" />
+              )}
             </div>
 
             {/* Verdict Text */}
             <div className="space-y-1 min-w-0 flex-1">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs uppercase font-extrabold tracking-wider">
-                  {result.verdict.level === 'go'
-                    ? 'Verdict: Go for it!'
+              <span
+                className={`text-xs font-black uppercase tracking-wider block font-heading ${
+                  result.verdict.level === 'go'
+                    ? 'text-[#4C8A3A]'
                     : result.verdict.level === 'think'
-                    ? 'Verdict: Think twice'
-                    : 'Verdict: Skip this purchase'}
-                </span>
-              </div>
-              <h2 className="text-base sm:text-lg font-bold leading-snug">
+                    ? 'text-[#9A6410]'
+                    : 'text-[#C2492E]'
+                }`}
+              >
+                {result.verdict.level === 'go'
+                  ? 'Verdict: Go for it!'
+                  : result.verdict.level === 'think'
+                  ? 'Verdict: Think twice'
+                  : 'Verdict: Skip this purchase'}
+              </span>
+
+              <h2 className="text-lg sm:text-xl font-bold font-heading leading-snug text-[#1E2140]">
                 {result.verdict.message}
               </h2>
             </div>
           </div>
 
           {/* Stats Breakdown Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 text-center">
-              <div className="text-xs text-slate-400 font-medium">Exact Matches</div>
-              <div className="text-xl font-bold text-white mt-1">{result.exactCount}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            <div className="bg-white/75 border border-white/70 rounded-2xl p-4 text-center shadow-xs">
+              <div className="text-[11px] font-bold text-[#6B7194] uppercase tracking-wider font-heading">
+                Exact Matches
+              </div>
+              <div className="text-2xl font-black font-heading text-[#1E2140] mt-1">
+                {result.exactCount}
+              </div>
             </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 text-center">
-              <div className="text-xs text-slate-400 font-medium">Similar Items</div>
-              <div className="text-xl font-bold text-indigo-400 mt-1">{result.similarCount}</div>
+
+            <div className="bg-white/75 border border-white/70 rounded-2xl p-4 text-center shadow-xs">
+              <div className="text-[11px] font-bold text-[#6B7194] uppercase tracking-wider font-heading">
+                Similar Items
+              </div>
+              <div className="text-2xl font-black font-heading text-[#4F5BD5] mt-1">
+                {result.similarCount}
+              </div>
             </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 text-center">
-              <div className="text-xs text-slate-400 font-medium">Total in Category</div>
-              <div className="text-xl font-bold text-slate-200 mt-1">{result.stats.totalInCategory}</div>
+
+            <div className="bg-white/75 border border-white/70 rounded-2xl p-4 text-center shadow-xs">
+              <div className="text-[11px] font-bold text-[#6B7194] uppercase tracking-wider font-heading">
+                Total in Category
+              </div>
+              <div className="text-2xl font-black font-heading text-[#1E2140] mt-1">
+                {result.stats.totalInCategory}
+              </div>
             </div>
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 text-center">
-              <div className="text-xs text-slate-400 font-medium">Worn Often (≥5)</div>
-              <div className="text-xl font-bold text-emerald-400 mt-1">{result.stats.wornOften}</div>
+
+            <div className="bg-white/75 border border-white/70 rounded-2xl p-4 text-center shadow-xs">
+              <div className="text-[11px] font-bold text-[#6B7194] uppercase tracking-wider font-heading">
+                Worn Often (≥5)
+              </div>
+              <div className="text-2xl font-black font-heading text-[#4C8A3A] mt-1">
+                {result.stats.wornOften}
+              </div>
             </div>
-            <div className="col-span-2 sm:col-span-1 bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 text-center">
-              <div className="text-xs text-slate-400 font-medium">Rarely Worn (≤1)</div>
-              <div className="text-xl font-bold text-rose-400 mt-1">{result.stats.rarelyWorn}</div>
+
+            <div className="col-span-2 sm:col-span-1 bg-white/75 border border-white/70 rounded-2xl p-4 text-center shadow-xs">
+              <div className="text-[11px] font-bold text-[#6B7194] uppercase tracking-wider font-heading">
+                Rarely Worn (≤1)
+              </div>
+              <div className="text-2xl font-black font-heading text-[#C2492E] mt-1">
+                {result.stats.rarelyWorn}
+              </div>
             </div>
           </div>
 
-          {/* Matching Items Grid */}
+          {/* MATCHING ITEMS IN THE PRODUCT CARD STYLE */}
           {result.matches.length === 0 ? (
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-10 text-center space-y-3">
+            <div className="bg-white/75 border border-white/70 rounded-3xl p-10 text-center space-y-3 shadow-xs backdrop-blur-xl">
               <div className="text-4xl">🎉</div>
-              <h3 className="text-base sm:text-lg font-bold text-white">
+              <h3 className="text-lg font-bold font-heading text-[#1E2140]">
                 No Existing Duplicates Found
               </h3>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
-                You don't currently have anything similar to this {color} {category}. Adding it will expand your styling range!
+              <p className="text-xs sm:text-sm text-[#6B7194] max-w-md mx-auto">
+                You don't currently have anything similar to this {color} {category}. Adding it will expand your wardrobe palette!
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-                <span className="font-semibold text-slate-200 uppercase tracking-wider">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-[#6B7194] px-1">
+                <span className="font-bold text-[#1E2140] uppercase tracking-wider font-heading">
                   Similar Items in Your Wardrobe ({result.matches.length})
                 </span>
-                <span>Sorted by similarity match</span>
+                <span className="font-mono">Ranked by similarity</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {/* Product Cards Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-6">
                 {result.matches.map((item) => {
                   const emoji = CATEGORY_EMOJI[item.category] || '👕';
-                  const dot = getColorDot(item.color);
+                  const colorInfo = getColorInfo(item.color);
                   const matchPct = Math.round(item.score * 100);
 
                   return (
                     <div
                       key={item.id}
-                      className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden flex flex-col group hover:border-slate-700 transition"
+                      className="bg-white/75 border border-white/70 hover:border-white rounded-3xl overflow-hidden flex flex-col group transition-all duration-300 hover:-translate-y-1 shadow-[0_10px_30px_rgba(99,102,241,0.06)] hover:shadow-[0_14px_40px_rgba(99,102,241,0.12)] backdrop-blur-xl p-3 space-y-3"
                     >
-                      {/* Thumbnail Container */}
-                      <div className="aspect-[4/5] bg-slate-800 relative overflow-hidden flex items-center justify-center">
+                      {/* Product Card Inner Frame (aspect 4/5) */}
+                      <div className="aspect-[4/5] bg-white/40 rounded-2xl relative overflow-hidden flex items-center justify-center border border-white/60">
                         {item.imageUrl ? (
                           <img
                             src={item.imageUrl}
@@ -472,75 +471,83 @@ export default function BeforeYouBuy() {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-                          <span className="text-4xl">{emoji}</span>
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-white/50">
+                            <span className="text-4xl filter drop-shadow-xs">{emoji}</span>
+                          </div>
                         )}
 
-                        {/* Top Badges */}
-                        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-md backdrop-blur-md ${
-                              item.matchType === 'exact'
-                                ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/40'
-                                : 'bg-indigo-950/90 text-indigo-300 border border-indigo-500/40'
-                            }`}
+                        {/* Soft bottom gradient overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
+
+                        {/* Top Match Badge: "Exact match" and "Similar" pills */}
+                        <div className="absolute top-2.5 left-2.5">
+                          <StatusPill
+                            variant={item.matchType === 'exact' ? 'green' : 'blue'}
+                            size="sm"
+                            dot
+                            className="shadow-xs"
                           >
                             {item.matchType === 'exact' ? 'Exact match' : 'Similar'}
-                          </span>
+                          </StatusPill>
                         </div>
 
                         {/* Similarity Score Tag */}
-                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-slate-950/80 backdrop-blur-md text-slate-200 border border-slate-700/60">
+                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-lg text-[10px] font-black font-mono bg-white/90 backdrop-blur-md text-[#1E2140] border border-white/90 shadow-2xs">
                           {matchPct}% match
                         </span>
                       </div>
 
                       {/* Content Details */}
-                      <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                      <div className="p-1 flex-1 flex flex-col justify-between space-y-2.5">
                         <div className="space-y-1 min-w-0">
                           <Link
                             to={`/wardrobe/${item.id}/edit`}
-                            className="text-sm font-semibold text-slate-100 hover:text-indigo-300 transition truncate block"
+                            className="text-xs sm:text-sm font-bold font-heading text-[#1E2140] group-hover:text-[#4F5BD5] transition-colors truncate block"
+                            title={item.name}
                           >
                             {item.name}
                           </Link>
-                          <div className="flex items-center space-x-1.5 text-xs text-slate-400">
+                          <div className="flex items-center space-x-1.5 text-xs text-[#6B7194] min-w-0">
                             <span
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: dot }}
+                              className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10"
+                              style={{ backgroundColor: colorInfo.hex }}
                             />
                             <span className="capitalize truncate">{item.color}</span>
                           </div>
                         </div>
 
                         {/* Usage Metrics */}
-                        <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 space-y-0.5">
+                        <div className="pt-2 border-t border-[#E3E6FB]/80 text-[11px] text-[#6B7194] space-y-1">
                           <div className="flex items-center justify-between">
                             <span>Wear count:</span>
                             <span
-                              className={`font-semibold ${
+                              className={`font-semibold font-mono ${
                                 item.wearCount >= 5
-                                  ? 'text-emerald-400'
+                                  ? 'text-[#4C8A3A]'
                                   : item.wearCount <= 1
-                                  ? 'text-rose-400'
-                                  : 'text-slate-200'
+                                  ? 'text-[#C2492E]'
+                                  : 'text-[#1E2140]'
                               }`}
                             >
                               {item.wearCount} {item.wearCount === 1 ? 'time' : 'times'}
                             </span>
                           </div>
-                          <div className="text-[10px] text-slate-400 truncate">
+                          <div className="text-[10px] text-[#6B7194] truncate">
                             {formatLastWorn(item.lastWornAt)}
                           </div>
                         </div>
 
-                        {/* View / Edit Link */}
+                        {/* View in Wardrobe Button */}
                         <div className="pt-1">
-                          <Link
+                          <Button
+                            as={Link}
                             to={`/wardrobe/${item.id}/edit`}
-                            className="w-full text-center block text-xs font-medium py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/60 transition"
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
                           >
                             View in wardrobe
-                          </Link>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -554,4 +561,3 @@ export default function BeforeYouBuy() {
     </div>
   );
 }
-

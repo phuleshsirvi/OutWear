@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getItem, updateItem, uploadImage } from '../api/items.js';
 import ItemForm from '../components/ItemForm.jsx';
+import Button from '../components/ui/Button.jsx';
 
 export default function EditItem() {
   const { id } = useParams();
@@ -88,30 +89,34 @@ export default function EditItem() {
 
   if (loading) {
     return (
-      <div className="w-full max-w-2xl mx-auto py-12 flex flex-col items-center justify-center space-y-4">
-        <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Loading item details...</p>
+      <div className="w-full max-w-2xl mx-auto py-16 flex flex-col items-center justify-center space-y-4 font-sans animate-fade-in-up">
+        <div className="w-10 h-10 border-4 border-[#4F5BD5]/20 border-t-[#4F5BD5] rounded-full animate-spin" />
+        <p className="text-[#6B7194] text-sm">Loading item details...</p>
       </div>
     );
   }
 
   if (loadError || !item) {
     return (
-      <div className="w-full max-w-md mx-auto py-12 text-center space-y-4">
-        <div className="w-14 h-14 mx-auto rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-2xl">
-          ⚠️
-        </div>
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold text-slate-100">Item Not Found</h2>
-          <p className="text-slate-400 text-sm">{loadError || 'The requested item could not be found.'}</p>
-        </div>
-        <div className="pt-2">
-          <Link
-            to="/wardrobe"
-            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/20"
-          >
-            ← Back to Wardrobe
-          </Link>
+      <div className="w-full max-w-md mx-auto py-16 text-center space-y-4 font-sans animate-fade-in-up">
+        <div className="rounded-3xl bg-white/75 border border-white/70 backdrop-blur-xl p-8 shadow-[0_10px_40px_rgba(99,102,241,0.08)] space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-full bg-[#FBE3DC] text-[#C2492E] flex items-center justify-center text-2xl shadow-xs">
+            ⚠️
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold font-heading text-[#1E2140]">Item Not Found</h2>
+            <p className="text-[#6B7194] text-sm">{loadError || 'The requested item could not be found.'}</p>
+          </div>
+          <div className="pt-2">
+            <Button
+              as={Link}
+              to="/wardrobe"
+              variant="primary"
+              size="md"
+            >
+              ← Back to Wardrobe
+            </Button>
+          </div>
         </div>
       </div>
     );

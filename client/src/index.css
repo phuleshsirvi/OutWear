@@ -1,1 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Primary Brand & Accents */
+  --color-primary: #4F5BD5;
+  --color-primary-soft: #E3E6FB;
+  --color-primary-hover: #434EB9;
+  --color-primary-active: #38429E;
+
+  /* Ink / Text */
+  --color-ink: #1E2140;
+  --color-muted: #6B7194;
+  --color-ink-light: #8E94B5;
+
+  /* Background Gradient Stops */
+  --color-bg-start: #C9CCF5;
+  --color-bg-mid: #DDE0F7;
+  --color-bg-end: #CFE6E0;
+
+  /* Glass Surface Tokens */
+  --color-surface-glass: rgba(255, 255, 255, 0.65);
+  --color-surface-glass-hover: rgba(255, 255, 255, 0.80);
+  --color-surface-glass-solid: rgba(255, 255, 255, 0.95);
+  --color-border-glass: rgba(255, 255, 255, 0.60);
+  --color-border-glass-subtle: rgba(255, 255, 255, 0.40);
+
+  /* Status Tokens */
+  --color-status-green-bg: #E3F2D9;
+  --color-status-green-text: #4C8A3A;
+  --color-status-blue-bg: #DCE8FB;
+  --color-status-blue-text: #3B5FB0;
+  --color-status-red-bg: #FBE3DC;
+  --color-status-red-text: #C2492E;
+  --color-status-amber-bg: #FCEBD0;
+  --color-status-amber-text: #9A6410;
+
+  /* Pastel Chart Tokens */
+  --color-chart-lavender: #B8BEF5;
+  --color-chart-green: #A8D5A2;
+  --color-chart-blue: #9CC3F5;
+  --color-chart-orange: #F5C98A;
+  --color-chart-grey: #E3E5EE;
+
+  /* Radii */
+  --radius-card: 1.5rem; /* rounded-3xl */
+  --radius-control: 1rem; /* rounded-2xl */
+  --radius-pill: 9999px; /* rounded-full */
+
+  /* Lavender Tinted Glass Shadows */
+  --shadow-glass: 0 10px 40px rgba(99, 102, 241, 0.12);
+  --shadow-glass-lg: 0 16px 50px rgba(99, 102, 241, 0.18);
+  --shadow-glass-sm: 0 4px 20px rgba(99, 102, 241, 0.08);
+  --shadow-primary-soft: 0 8px 24px rgba(79, 91, 213, 0.28);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    background-color: #DDE0F7;
+    color: #1E2140;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: #1E2140;
+    background: linear-gradient(135deg, #C9CCF5 0%, #DDE0F7 50%, #CFE6E0 100%) fixed;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: #1E2140;
+    letter-spacing: -0.02em;
+  }
+
+  /* Accessible focus indicators */
+  :focus-visible {
+    outline: 2px solid #4F5BD5;
+    outline-offset: 2px;
+  }
+}
+
+/* Background hex pattern overlay */
+.glass-pattern-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l25.98 15v30L30 60 4.02 45V15z' fill-opacity='0' stroke='%234F5BD5' stroke-width='0.75'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
+  opacity: 0.035;
+}
+
+/* Frosted glass utilities */
+.glass-card {
+  background-color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.60);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 40px rgba(99, 102, 241, 0.12);
+}
+
+.glass-panel {
+  background-color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.60);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 40px rgba(99, 102, 241, 0.12);
+}
+
+.glass-card-hover {
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-card-hover:hover {
+  background-color: rgba(255, 255, 255, 0.80);
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 16px 50px rgba(99, 102, 241, 0.16);
+  transform: translateY(-2px);
+}
+
+/* Compatibility bridging for pages not yet individually restyled */
+[class*="bg-[#131A2E]"],
+[class*="bg-[#1B2440]"] {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(255, 255, 255, 0.60) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 10px 40px rgba(99, 102, 241, 0.12) !important;
+}
+
+[class*="bg-[#0B1020]"] {
+  background-color: rgba(255, 255, 255, 0.45) !important;
+  border-color: rgba(255, 255, 255, 0.50) !important;
+}
+
+.text-slate-100,
+.text-slate-200 {
+  color: #1E2140 !important;
+}
+
+.text-slate-300,
+.text-slate-400 {
+  color: #6B7194 !important;
+}
+
+.text-slate-500 {
+  color: #8E94B5 !important;
+}
+
+[class*="border-slate-800"],
+[class*="border-slate-700"] {
+  border-color: rgba(255, 255, 255, 0.60) !important;
+}
+
+/* Gentle 200ms animations */
+@keyframes gentleFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: gentleFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in-up {
+  animation: gentleFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Accessibility: respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-in-up {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

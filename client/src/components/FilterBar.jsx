@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { CATEGORIES, SEASONS, OCCASIONS } from '../constants/wardrobe.js';
+import { Search, X } from 'lucide-react';
+import { SEASONS, OCCASIONS } from '../constants/wardrobe.js';
+import { getColorInfo } from '../constants/colors.js';
+import PillTabs from './ui/PillTabs.jsx';
+import Select from './ui/Select.jsx';
 
 function formatLabel(str) {
   if (!str) return '';
@@ -9,6 +13,17 @@ function formatLabel(str) {
     .join('-');
 }
 
+const CATEGORY_TABS = [
+  { id: '', label: 'All' },
+  { id: 'top', label: 'Tops' },
+  { id: 'bottom', label: 'Bottoms' },
+  { id: 'dress', label: 'Dresses' },
+  { id: 'ethnic', label: 'Ethnic' },
+  { id: 'outerwear', label: 'Outerwear' },
+  { id: 'shoes', label: 'Shoes' },
+  { id: 'accessory', label: 'Accessories' },
+];
+
 export default function FilterBar({
   filters = { search: '', category: '', color: '', season: '', occasion: '' },
   onFilterChange,
@@ -16,9 +31,8 @@ export default function FilterBar({
   availableColors = [],
 }) {
   const [searchInput, setSearchInput] = useState(filters.search || '');
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Synchronize local search input when external search filter changes (e.g., cleared)
+  // Synchronize local search input when external search filter changes
   useEffect(() => {
     setSearchInput(filters.search || '');
   }, [filters.search]);
@@ -34,129 +48,75 @@ export default function FilterBar({
     return () => clearTimeout(timer);
   }, [searchInput, filters.search, onFilterChange]);
 
-  // Calculate active filter count
-  const activeCount = Object.entries(filters).filter(
-    ([, value]) => typeof value === 'string' && value.trim().length > 0
-  ).length;
+  // Calculate active filters array for removable chips
+  const activeFilters = Object.entries(filters)
+    .filter(([, value]) => typeof value === 'string' && value.trim().length > 0)
+    .map(([key, value]) => ({ key, value }));
+
+  const activeCount = activeFilters.length;
 
   const handleClear = () => {
     setSearchInput('');
     onClearFilters();
   };
 
+  const handleRemoveFilter = (filterKey) => {
+    if (filterKey === 'search') {
+      setSearchInput('');
+    }
+    onFilterChange(filterKey, '');
+  };
+
   return (
-    <div className="w-full bg-slate-800/80 border border-slate-700/80 backdrop-blur rounded-2xl p-3.5 sm:p-4 shadow-lg space-y-3">
-      {/* Search Input Row with Mobile Filter Toggle */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Search Box */}
-        <div className="relative flex-1">
-          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name, fabric, or color..."
-            className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-xs sm:text-sm transition"
-          />
-          {searchInput && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchInput('');
-                onFilterChange('search', '');
-              }}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200 text-xs"
-              aria-label="Clear search"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Mobile Filter Toggle Button */}
-        <button
-          type="button"
-          onClick={() => setIsMobileOpen((prev) => !prev)}
-          className={`md:hidden flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition cursor-pointer shrink-0 ${
-            activeCount > 0
-              ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/40'
-              : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
-          }`}
-          aria-expanded={isMobileOpen}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-            />
-          </svg>
-          <span>Filters</span>
-          {activeCount > 0 && (
-            <span className="ml-1 px-1.5 py-0.2 rounded-full bg-indigo-500 text-white text-[10px] font-semibold">
-              {activeCount}
-            </span>
-          )}
-        </button>
-
-        {/* Desktop Clear Filters button (when active) */}
-        {activeCount > 0 && (
+    <div className="w-full bg-white/70 border border-white/60 backdrop-blur-xl rounded-3xl p-4 sm:p-5 shadow-[0_10px_35px_rgba(99,102,241,0.08)] space-y-4 font-sans">
+      {/* Search Bar Row */}
+      <div className="relative">
+        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6B7194]">
+          <Search className="w-4 h-4" />
+        </span>
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search clothes by name, fabric, or color..."
+          className="w-full min-h-[44px] pl-10 pr-10 py-2.5 rounded-2xl bg-white/80 hover:bg-white focus:bg-white border border-white/80 text-[#1E2140] placeholder-[#6B7194] focus:outline-none focus:ring-2 focus:ring-[#4F5BD5]/25 focus:border-[#4F5BD5] text-xs sm:text-sm shadow-xs transition-all duration-200"
+        />
+        {searchInput && (
           <button
             type="button"
-            onClick={handleClear}
-            className="hidden md:inline-flex items-center px-3 py-2 rounded-xl text-xs text-slate-400 hover:text-indigo-400 hover:bg-slate-900/70 border border-slate-700/60 transition cursor-pointer shrink-0"
+            onClick={() => {
+              setSearchInput('');
+              onFilterChange('search', '');
+            }}
+            className="absolute inset-y-0 right-0 pr-3.5 min-w-[44px] flex items-center justify-center text-[#6B7194] hover:text-[#1E2140] transition-colors cursor-pointer"
+            aria-label="Clear search"
           >
-            Clear filters
+            <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      {/* Select Dropdowns (always visible on md+, collapsible on mobile) */}
-      <div
-        className={`${
-          isMobileOpen ? 'grid' : 'hidden md:grid'
-        } grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1`}
-      >
-        {/* Category Filter */}
-        <div>
-          <label htmlFor="filter-category" className="sr-only">
-            Category
-          </label>
-          <select
-            id="filter-category"
-            value={filters.category || ''}
-            onChange={(e) => onFilterChange('category', e.target.value)}
-            className="w-full px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
-          >
-            <option value="">All Categories</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {formatLabel(cat)}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Category PillTabs (Horizontally scrollable on mobile) */}
+      <div className="pt-0.5">
+        <PillTabs
+          tabs={CATEGORY_TABS}
+          activeTab={filters.category || ''}
+          onChange={(tabId) => onFilterChange('category', tabId)}
+          aria-label="Filter clothes by category"
+        />
+      </div>
 
-        {/* Color Filter */}
+      {/* Select Dropdowns for Color, Season, Occasion */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-0.5">
         <div>
           <label htmlFor="filter-color" className="sr-only">
             Color
           </label>
-          <select
+          <Select
             id="filter-color"
             value={filters.color || ''}
             onChange={(e) => onFilterChange('color', e.target.value)}
-            className="w-full px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition capitalize"
+            aria-label="Filter by color"
           >
             <option value="">All Colors</option>
             {availableColors.map((col) => (
@@ -164,19 +124,18 @@ export default function FilterBar({
                 {col}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
-        {/* Season Filter */}
         <div>
           <label htmlFor="filter-season" className="sr-only">
             Season
           </label>
-          <select
+          <Select
             id="filter-season"
             value={filters.season || ''}
             onChange={(e) => onFilterChange('season', e.target.value)}
-            className="w-full px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
+            aria-label="Filter by season"
           >
             <option value="">All Seasons</option>
             {SEASONS.map((seas) => (
@@ -184,19 +143,18 @@ export default function FilterBar({
                 {formatLabel(seas)}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
-        {/* Occasion Filter */}
         <div>
           <label htmlFor="filter-occasion" className="sr-only">
             Occasion
           </label>
-          <select
+          <Select
             id="filter-occasion"
             value={filters.occasion || ''}
             onChange={(e) => onFilterChange('occasion', e.target.value)}
-            className="w-full px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
+            aria-label="Filter by occasion"
           >
             <option value="">All Occasions</option>
             {OCCASIONS.map((occ) => (
@@ -204,23 +162,69 @@ export default function FilterBar({
                 {formatLabel(occ)}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
-
-        {/* Mobile Clear Filters Button in dropdowns */}
-        {activeCount > 0 && (
-          <div className="col-span-2 sm:col-span-2 md:hidden pt-1">
-            <button
-              type="button"
-              onClick={handleClear}
-              className="w-full py-1.5 px-3 rounded-xl text-xs text-center text-slate-300 hover:text-white bg-slate-900/90 border border-slate-700/80 transition"
-            >
-              Clear all filters ({activeCount})
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Removable Active Filter Chips */}
+      {activeCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E3E6FB]">
+          <span className="text-[11px] font-bold text-[#6B7194] uppercase tracking-wider mr-1">
+            Active:
+          </span>
+
+          {activeFilters.map(({ key, value }) => {
+            const isColorFilter = key === 'color';
+            const colorInfo = isColorFilter ? getColorInfo(value) : null;
+            const displayLabel =
+              key === 'category'
+                ? 'Category'
+                : key === 'season'
+                ? 'Season'
+                : key === 'occasion'
+                ? 'Occasion'
+                : key === 'search'
+                ? 'Search'
+                : key;
+
+            return (
+              <span
+                key={key}
+                className="inline-flex items-center space-x-1.5 pl-3 pr-1.5 py-1 rounded-full text-xs font-semibold bg-white/90 text-[#1E2140] border border-white shadow-xs backdrop-blur-md"
+              >
+                {isColorFilter && colorInfo && (
+                  <span
+                    className="w-2.5 h-2.5 rounded-full inline-block mr-0.5 border border-black/10 shadow-xs"
+                    style={{ backgroundColor: colorInfo.hex }}
+                  />
+                )}
+                <span className="text-[11px] text-[#6B7194] uppercase font-bold">
+                  {displayLabel}:
+                </span>
+                <span className="capitalize font-medium text-[#1E2140]">
+                  {key === 'search' ? `"${value}"` : formatLabel(value)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFilter(key)}
+                  aria-label={`Remove filter ${key} ${value}`}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[#6B7194] hover:text-[#C2492E] hover:bg-rose-50 transition-colors cursor-pointer ml-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </span>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={handleClear}
+            className="text-xs text-[#4F5BD5] hover:text-[#3B5FB0] font-semibold underline underline-offset-4 cursor-pointer ml-2 py-1 px-2 rounded-lg hover:bg-white/50 transition-colors"
+          >
+            Clear all ({activeCount})
+          </button>
+        </div>
+      )}
     </div>
   );
 }
-

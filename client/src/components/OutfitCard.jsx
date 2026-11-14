@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { Pencil, Trash2, Calendar, Check } from 'lucide-react';
 import { deleteOutfit } from '../api/outfits.js';
 import { logOutfitWear } from '../api/wear.js';
+import { Button, Badge, Modal, Toast } from './ui/index.js';
 
 // Fallback category emojis for items without images
 const CATEGORY_EMOJI = {
@@ -12,6 +14,16 @@ const CATEGORY_EMOJI = {
   outerwear: '🧥',
   shoes: '👟',
   accessory: '👜',
+};
+
+// Map occasion to status badge variant
+const OCCASION_BADGE_MAP = {
+  formal: 'primary',
+  party: 'red',
+  casual: 'blue',
+  work: 'primary',
+  festive: 'amber',
+  sports: 'green',
 };
 
 function formatLabel(str) {
@@ -34,7 +46,7 @@ export default function OutfitCard({ outfit, onDelete }) {
   const [toast, setToast] = useState(null);
   const toastTimeoutRef = useRef(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const [todayStr] = useState(() => new Date().toISOString().split('T')[0]);
   const items = outfit.items || [];
   const totalCount = items.length;
 
@@ -94,12 +106,16 @@ export default function OutfitCard({ outfit, onDelete }) {
   const collageSlots = [0, 1, 2, 3];
   const hasMoreThanFour = totalCount > 4;
 
+  const occasionVariant = outfit.occasion
+    ? OCCASION_BADGE_MAP[outfit.occasion.toLowerCase()] || 'neutral'
+    : 'neutral';
+
   return (
     <>
-      <div className="group relative rounded-2xl bg-slate-800/80 border border-slate-700/80 hover:border-indigo-500/50 shadow-md hover:shadow-indigo-500/10 transition-all duration-200 overflow-hidden flex flex-col justify-between">
+      <div className="group relative rounded-3xl bg-white/75 border border-white/70 hover:border-white shadow-[0_10px_35px_rgba(99,102,241,0.08)] hover:shadow-[0_14px_45px_rgba(99,102,241,0.14)] transition-all duration-300 overflow-hidden flex flex-col justify-between backdrop-blur-xl hover:-translate-y-1 font-sans p-3 sm:p-3.5 space-y-3">
         {/* Collage Container (fixed 1:1 square ratio) */}
-        <div className="relative aspect-square w-full bg-slate-900/80 p-2 overflow-hidden">
-          <div className="grid grid-cols-2 grid-rows-2 gap-1.5 w-full h-full">
+        <div className="relative aspect-square w-full bg-white/40 p-2 overflow-hidden rounded-2xl border border-white/60">
+          <div className="grid grid-cols-2 grid-rows-2 gap-2 w-full h-full">
             {collageSlots.map((slotIndex) => {
               const item = items[slotIndex];
               const isFourthSlotWithMore = slotIndex === 3 && hasMoreThanFour;
@@ -109,9 +125,9 @@ export default function OutfitCard({ outfit, onDelete }) {
                 return (
                   <div
                     key={slotIndex}
-                    className="w-full h-full rounded-xl bg-slate-950/40 border border-slate-800/60 flex items-center justify-center text-slate-600 text-lg select-none"
+                    className="w-full h-full rounded-xl bg-white/60 border border-white/80 flex items-center justify-center text-[#6B7194] text-lg select-none"
                   >
-                    <span>✨</span>
+                    <span className="opacity-40">✨</span>
                   </div>
                 );
               }
@@ -122,19 +138,19 @@ export default function OutfitCard({ outfit, onDelete }) {
               return (
                 <div
                   key={item.id || slotIndex}
-                  className="relative w-full h-full rounded-xl overflow-hidden bg-slate-950/70 border border-slate-800 flex items-center justify-center group/item"
+                  className="relative w-full h-full rounded-xl overflow-hidden bg-white/80 border border-white/90 flex items-center justify-center group/item"
                 >
                   {item.imageUrl ? (
                     <img
                       src={item.imageUrl}
                       alt={item.name}
                       loading="lazy"
-                      className="w-full h-full object-cover transition duration-300"
+                      className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-gradient-to-br from-slate-800/80 to-slate-900/90 select-none">
-                      <span className="text-xl sm:text-2xl">{emoji}</span>
-                      <span className="text-[10px] text-slate-400 font-mono truncate max-w-full px-1">
+                    <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-white/50 select-none">
+                      <span className="text-xl sm:text-2xl filter drop-shadow-xs">{emoji}</span>
+                      <span className="text-[10px] text-[#6B7194] font-medium truncate max-w-full px-1">
                         {item.name}
                       </span>
                     </div>
@@ -142,7 +158,7 @@ export default function OutfitCard({ outfit, onDelete }) {
 
                   {/* If more than 4 items, overlay +N on 4th slot */}
                   {isFourthSlotWithMore && (
-                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center text-white font-bold text-sm sm:text-base border border-indigo-500/40">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center text-white font-heading font-bold text-base sm:text-lg rounded-xl">
                       +{totalCount - 3}
                     </div>
                   )}
@@ -151,22 +167,15 @@ export default function OutfitCard({ outfit, onDelete }) {
             })}
           </div>
 
-          {/* Action buttons (Visible on mobile, subtle hover reveal on desktop) */}
-          <div className="absolute top-3 right-3 flex items-center space-x-1.5 z-10 bg-slate-900/90 backdrop-blur-md rounded-xl p-1 border border-slate-700/90 shadow-lg opacity-100 sm:opacity-90 sm:group-hover:opacity-100 transition-opacity">
+          {/* Round Icon Action Buttons (Visible on mobile, subtle hover reveal on desktop) */}
+          <div className="absolute top-3 right-3 flex items-center space-x-1.5 z-10 bg-white/90 backdrop-blur-md rounded-full p-1 border border-white/90 shadow-sm opacity-100 sm:opacity-90 sm:group-hover:opacity-100 transition-opacity">
             <Link
               to={`/outfits/${outfit.id}/edit`}
               title="Edit outfit"
               aria-label={`Edit ${outfit.name}`}
-              className="p-1.5 text-slate-300 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#6B7194] hover:text-[#4F5BD5] hover:bg-[#E3E6FB]/60 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                />
-              </svg>
+              <Pencil className="w-4 h-4" />
             </Link>
             <button
               type="button"
@@ -176,202 +185,160 @@ export default function OutfitCard({ outfit, onDelete }) {
               }}
               title="Delete outfit"
               aria-label={`Delete ${outfit.name}`}
-              className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#6B7194] hover:text-[#C2492E] hover:bg-rose-50 transition-colors cursor-pointer"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Card Details */}
-        <div className="p-4 flex flex-col space-y-3">
+        <div className="px-1 flex flex-col space-y-2.5">
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <h3
-                className="text-base font-semibold text-slate-100 truncate"
+                className="text-base font-bold font-heading text-[#1E2140] truncate"
                 title={outfit.name}
               >
                 {outfit.name}
               </h3>
-              <span className="shrink-0 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700/80 text-[11px] font-mono text-slate-400">
+              <span className="text-xs font-semibold text-[#6B7194] shrink-0">
                 {totalCount} {totalCount === 1 ? 'item' : 'items'}
               </span>
             </div>
+
             {outfit.occasion && (
-              <p className="text-xs font-medium text-indigo-400 capitalize">
-                {formatLabel(outfit.occasion)}
-              </p>
+              <div>
+                <Badge variant={occasionVariant} size="sm" pill>
+                  {formatLabel(outfit.occasion)}
+                </Badge>
+              </div>
             )}
           </div>
 
           {/* Item summary tags */}
-          <div className="flex flex-wrap gap-1 text-[11px] text-slate-400">
+          <div className="flex flex-wrap gap-1 text-[11px] text-[#6B7194]">
             {items.slice(0, 3).map((item) => (
               <span
                 key={item.id}
-                className="px-2 py-0.5 rounded-md bg-slate-900/80 border border-slate-700/60 truncate max-w-[120px]"
+                className="px-2 py-0.5 rounded-lg bg-white/70 border border-white/80 shadow-xs truncate max-w-[120px]"
                 title={item.name}
               >
                 {item.name}
               </span>
             ))}
             {totalCount > 3 && (
-              <span className="px-1.5 py-0.5 text-slate-500 font-mono">
+              <span className="px-1.5 py-0.5 text-[#6B7194] font-medium text-[11px]">
                 +{totalCount - 3} more
               </span>
             )}
           </div>
 
-          {/* Outfit Wear Action Buttons: "Wore today" + "Pick a date" */}
-          <div className="pt-2 border-t border-slate-700/60 space-y-1.5">
-            <div className="flex items-center space-x-1.5">
+          {/* Outfit Wear Action Buttons: White "Wore today" Button + Pick a date */}
+          <div className="pt-2 border-t border-[#E3E6FB]/80 space-y-2">
+            <div className="flex items-center space-x-2">
               <button
                 type="button"
                 onClick={() => handleLogWear()}
                 disabled={isLoggingWear}
                 aria-label={`Log wear for outfit ${outfit.name}`}
-                className="flex-1 py-1.5 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-indigo-200 border border-indigo-500/30 text-xs font-medium transition cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5"
+                className="flex-1 min-h-[44px] py-2.5 px-4 rounded-2xl bg-white hover:bg-white/90 text-[#1E2140] border border-white/90 shadow-xs hover:shadow-md transition-all duration-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                {isLoggingWear ? (
-                  <div className="w-3.5 h-3.5 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <span>👔</span>
-                    <span>Wore today</span>
-                  </>
-                )}
+                <Check className="w-4 h-4 text-[#4C8A3A]" />
+                <span>{isLoggingWear ? 'Logging...' : 'Wore today'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowDatePicker(!showDatePicker)}
-                title="Pick a custom wear date"
+                title="Pick custom wear date"
                 aria-label="Pick outfit wear date"
-                className={`p-1.5 rounded-xl border text-xs transition cursor-pointer ${
+                className={`min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-2xl border text-xs transition-all duration-200 cursor-pointer shrink-0 shadow-xs ${
                   showDatePicker
-                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
-                    : 'bg-slate-900/90 text-slate-400 hover:text-slate-200 border-slate-700/80 hover:bg-slate-850'
+                    ? 'bg-[#4F5BD5] text-white border-[#4F5BD5] shadow-md shadow-[#4F5BD5]/20'
+                    : 'bg-white hover:bg-white/90 text-[#6B7194] hover:text-[#1E2140] border-white/90'
                 }`}
               >
-                📅
+                <Calendar className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Date Picker Input (Capped at today) */}
+            {/* Date Picker Input */}
             {showDatePicker && (
-              <div className="flex items-center space-x-1.5 p-1.5 rounded-xl bg-slate-900/90 border border-slate-700 animate-in fade-in duration-150">
+              <div className="flex items-center space-x-2 p-2 rounded-2xl bg-white/90 border border-white/90 shadow-sm animate-fade-in-up">
                 <input
                   type="date"
                   max={todayStr}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="flex-1 px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-slate-200 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-[#E3E6FB] text-[#1E2140] text-xs focus:ring-2 focus:ring-[#4F5BD5]/25 focus:border-[#4F5BD5] focus:outline-none"
                 />
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="sm"
                   disabled={!selectedDate || isLoggingWear}
                   onClick={() => handleLogWear(selectedDate)}
-                  className="py-1 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-medium transition cursor-pointer"
                 >
                   Log
-                </button>
+                </Button>
               </div>
             )}
           </div>
         </div>
-
-        {/* Card Toast Notification */}
-        {toast && (
-          <div
-            role="status"
-            className={`absolute bottom-3 left-3 right-3 z-30 p-2.5 rounded-xl text-xs font-medium shadow-2xl border backdrop-blur-md flex items-center justify-between animate-in fade-in slide-in-from-bottom-2 duration-200 ${
-              toast.type === 'warning'
-                ? 'bg-amber-950/95 text-amber-300 border-amber-600/50'
-                : toast.type === 'error'
-                ? 'bg-red-950/95 text-red-300 border-red-600/50'
-                : 'bg-emerald-950/95 text-emerald-300 border-emerald-600/50'
-            }`}
-          >
-            <span className="truncate pr-1">{toast.message}</span>
-            <button
-              onClick={() => setToast(null)}
-              className="text-slate-400 hover:text-slate-200 text-xs ml-1 cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
       </div>
 
+      {/* Card Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
+      )}
+
       {/* Delete Confirmation Modal */}
-      {showConfirm && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          onClick={() => !isDeleting && setShowConfirm(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 mx-auto rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-xl">
-              🗑️
-            </div>
+      <Modal
+        isOpen={showConfirm}
+        onClose={() => !isDeleting && setShowConfirm(false)}
+        title="Delete Outfit?"
+        description={`Are you sure you want to delete "${outfit.name}"? This action cannot be undone.`}
+      >
+        <div className="space-y-4 pt-1 font-sans">
+          <p className="text-xs text-[#6B7194]">
+            Note: Only the outfit grouping will be deleted. Individual clothing items will remain in your wardrobe safely.
+          </p>
 
-            <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-slate-100">
-                Delete this outfit?
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-400">
-                Are you sure you want to delete <span className="font-semibold text-slate-200">"{outfit.name}"</span>? This cannot be undone.
-              </p>
+          {deleteError && (
+            <div
+              role="alert"
+              className="text-xs text-[#C2492E] bg-[#FBE3DC] border border-rose-300 rounded-xl p-3"
+            >
+              ⚠️ {deleteError}
             </div>
+          )}
 
-            {deleteError && (
-              <div
-                role="alert"
-                className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl p-2.5 text-left"
-              >
-                {deleteError}
-              </div>
-            )}
-
-            <div className="flex items-center space-x-3 pt-2">
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs sm:text-sm transition border border-slate-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleDelete}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-medium text-xs sm:text-sm transition shadow-lg shadow-red-600/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center space-x-1.5"
-              >
-                {isDeleting ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <span>Delete</span>
-                )}
-              </button>
-            </div>
+          <div className="flex items-center justify-end space-x-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              disabled={isDeleting}
+              onClick={() => setShowConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              size="md"
+              loading={isDeleting}
+              onClick={handleDelete}
+            >
+              Delete Outfit
+            </Button>
           </div>
         </div>
-      )}
+      </Modal>
     </>
   );
 }
