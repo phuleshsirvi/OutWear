@@ -22,6 +22,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
+  COOKIE_SAMESITE: z.enum(['lax', 'none', 'strict']).optional(),
   CLOUDINARY_CLOUD_NAME: z
     .string({ required_error: 'CLOUDINARY_CLOUD_NAME is required' })
     .min(1, 'CLOUDINARY_CLOUD_NAME cannot be empty'),

@@ -19,7 +19,7 @@ import suggestionRoutes from './routes/suggestion.routes.js';
 import duplicateRoutes from './routes/duplicate.routes.js';
 
 const app = express();
-const PORT = env.PORT || 4000;
+const PORT = process.env.PORT || env.PORT || 4000;
 
 // 1. Security & Proxy Configuration
 app.disable('x-powered-by');
@@ -111,9 +111,9 @@ app.get('/', (req, res) => {
 // 13. Centralized Error Handler (must be mounted after all routes)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`OutWear server running on port ${PORT}`);
-  console.log(`Health check available at http://localhost:${PORT}/api/health`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`OutWear server running on port ${PORT} (0.0.0.0)`);
+  console.log(`Health check available at http://0.0.0.0:${PORT}/api/health`);
 });
 
 export { app };

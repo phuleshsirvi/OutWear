@@ -7,23 +7,33 @@ import env from '../config/env.js';
 // Precomputed 12-round bcrypt hash used to equalize execution time when a user does not exist
 const DUMMY_HASH = '$2a$12$e8uq0e1t.4W6Gv7yY3fV3OBk3cZc58M8hR58w2Yv28P2C.wE1Xf9W';
 
-// Cookie configuration options depending on NODE_ENV
+// Cookie configuration options depending on NODE_ENV and optional COOKIE_SAMESITE
 const getCookieOptions = () => {
   const isProd = (env.NODE_ENV || process.env.NODE_ENV) === 'production';
+  const sameSite =
+    env.COOKIE_SAMESITE ||
+    process.env.COOKIE_SAMESITE ||
+    (isProd ? 'none' : 'lax');
+
   return {
     httpOnly: true,
-    sameSite: isProd ? 'none' : 'lax',
-    secure: isProd,
+    sameSite,
+    secure: isProd || sameSite === 'none',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   };
 };
 
 const getClearCookieOptions = () => {
   const isProd = (env.NODE_ENV || process.env.NODE_ENV) === 'production';
+  const sameSite =
+    env.COOKIE_SAMESITE ||
+    process.env.COOKIE_SAMESITE ||
+    (isProd ? 'none' : 'lax');
+
   return {
     httpOnly: true,
-    sameSite: isProd ? 'none' : 'lax',
-    secure: isProd,
+    sameSite,
+    secure: isProd || sameSite === 'none',
   };
 };
 

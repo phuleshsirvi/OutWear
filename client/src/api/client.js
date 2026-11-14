@@ -1,4 +1,8 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const RAW_BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL =
+  typeof RAW_BASE_URL === 'string' && RAW_BASE_URL.trim().length > 0
+    ? RAW_BASE_URL.trim().replace(/\/+$/, '')
+    : 'http://localhost:4000/api';
 
 let unauthorizedHandler = null;
 
